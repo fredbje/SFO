@@ -1,5 +1,4 @@
 #include "drawer.h"
-//#include <libviso2/matrix.h>
 
 namespace SFO {
 
@@ -87,8 +86,6 @@ namespace SFO {
     void Drawer::updatePoseslib(std::vector<libviso2::Matrix>* libviso2PoseVec) {
         mptrPoselib->insert(mptrPoselib->end(), libviso2PoseVec->begin() + mptrPoselib->size(), libviso2PoseVec->end());
     }
-
-
 
     void Drawer::drawCurrentCamera(pangolin::OpenGlMatrix &Twc) {
         float CameraSize = 0.5;
@@ -262,7 +259,7 @@ namespace SFO {
 
         while(!pangolin::ShouldQuit()) {
 
-            // Set boot interupt point
+            // Set boot interrupt point
             boost::this_thread::interruption_point();
 
             // Clear screen and activate view to render into
@@ -276,8 +273,8 @@ namespace SFO {
 
             // Get the current transformation
             //Twc = get_matrix(manager->get_state());
-            Twc = get_matrix(mptrPoselib->at(mptrPoselib->size()-1));
-            drawCurrentCameraBlue(Twc);
+            ////Twc = get_matrix(mptrPoselib->at(mptrPoselib->size()-1));
+            ///drawCurrentCameraBlue(Twc);
 
 
             // Update the view camera

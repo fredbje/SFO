@@ -1,13 +1,15 @@
 #include<iostream>
 #include<iomanip>
+#include<algorithm>
+#include<iterator>
 
 #include<Eigen/Core>
 
 #include <boost/lambda/lambda.hpp>
 #include <boost/thread.hpp>
 #include <boost/filesystem.hpp>
-
-#include <png++/png.hpp>
+#include <boost/range/iterator_range.hpp>
+#include <boost/iostreams/device/back_inserter.hpp>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui.hpp>
@@ -22,15 +24,27 @@
 #include "stereo.h"
 #include "drawer.h"
 
-int main(){
-    std::string sequenceDirPath = "/home/fbjerkaas/Master/Datasets/kitti-gray/sequences/00/";
-    std::string gtPosesFileName = "/home/fbjerkaas/Master/Datasets/kitti-poses/dataset/poses/00.txt";
+namespace bfs = boost::filesystem;
 
-    std::cout << "Path to image sequence: " << sequenceDirPath << std::endl;
-    std::cout << "Path to ground truth poses: " << gtPosesFileName << std::endl;
+void loadImages(const bfs::path &sequenceDirPath, std::vector<bfs::path> &leftImageFileNames,
+                std::vector<bfs::path> &rightImageFileNames);
+void loadTimeStamps(const bfs::path &timeStampsFileName, std::vector<double> &timeStamps);
+void loadGtPoses(std::string gtPosesFileName);
 
-    size_t width = 1241;
-    size_t height = 376;
+int main(int argc, char **argv){
+    if(argc != 4)
+    {
+        std::cerr << std::endl << "Usage: ./SFO_main path_to_sequence path_to_timestamps path_to_gt_poses" << std::endl;
+        return 1;
+    }
+
+    std::vector<bfs::path> leftImageFileNames, rightImageFileNames;
+    loadImages(argv[1], leftImageFileNames, rightImageFileNames);
+
+    std::vector<double> timeStamps;
+    loadTimeStamps(argv[2], timeStamps);
+
+    loadGtPoses(argv[3]);
 
     // calibration parameters for odometery sequence 00
     libviso2::VisualOdometryStereo::parameters param;
@@ -63,7 +77,7 @@ int main(){
 
     //// For display the pose, begin the thread
     // init the drawer
-    SFO::Drawer poseDrawer(gtPosesFileName);
+    SFO::Drawer poseDrawer(argv[3]);
     // Start the drawer thread
     boost::thread threadDrawer(boost::bind(&SFO::Drawer::start, poseDrawer));
 /////////////////////////////////////////////
@@ -83,42 +97,27 @@ int main(){
     poseDrawer.updatePoses(gtsamPoseVec);
     poseDrawer.updatePoseslib(libviso2PoseVec);
 
-    char frameFileName[256];
-    cv::String leftImgPath, rightImgPath;
-    png::image<png::gray_pixel> leftImg, rightImg;
-    auto *left_img_data = (uint8_t *)malloc(width * height * sizeof(uint8_t));
-    auto *right_img_data = (uint8_t *)malloc(width * height * sizeof(uint8_t));
+    // Allocate variables for the loop
+    cv::Size refImageSize = cv::imread(leftImageFileNames[0].string()).size();
+    cv::Mat img_C1 = cv::Mat(refImageSize, CV_8UC1);
+    cv::Mat img_C2 = cv::Mat(refImageSize, CV_8UC1);
+    std::int32_t dims[] = {refImageSize.width, refImageSize.height, refImageSize.width};
 
-    // compute visual odometry
-    std::int32_t dims[] = {static_cast<std::int32_t>(width),
-                           static_cast<std::int32_t>(height),
-                           static_cast<std::int32_t>(width)};
-
+    //                          4541
     for (std::size_t i = 0; i < 4541; i++) {
 
-        // input file name
-        sprintf(frameFileName, "%06zu.png", i);
-        leftImgPath  = sequenceDirPath + "/image_0/" + frameFileName;
-        rightImgPath = sequenceDirPath + "/image_1/" + frameFileName;
-
         try {
-            // load left and right input image
-            leftImg.read(leftImgPath);
-            rightImg.read(rightImgPath);
+            img_C1 = cv::imread(leftImageFileNames[i].string(), cv::IMREAD_GRAYSCALE);
+            img_C2 = cv::imread(rightImageFileNames[i].string(), cv::IMREAD_GRAYSCALE);
 
-            std::size_t v, u;
-            std::size_t k = 0;
-            for (v = 0; v < height; v++) {
-                for (u = 0; u < width; u++) {
-                    left_img_data[k]  = leftImg.get_pixel(u, v);
-                    right_img_data[k] = rightImg.get_pixel(u, v);
-                    k++;
-                }
+            if(img_C1.size() != refImageSize || img_C2.size() != refImageSize) {
+                std::cerr << "Images in sequence have different size." << std::endl;
+                break;
             }
 
             std::cout << "Processing: Frame: " << std::setw(4) << i;
 
-            if (viso->process(left_img_data, right_img_data, dims)) {
+            if (viso->process(img_C1.data, img_C2.data, dims)) {
                 // on success, update current pose
                 // get the matches
                 pM.clear();
@@ -151,19 +150,11 @@ int main(){
                 poseDrawer.updatePoses(gtsamPoseVec);
                 poseDrawer.updatePoseslib(libviso2PoseVec);
 
-                // Display nice image,
-                //cv::Mat img_C1 = Mat(height, width, CV_8UC1, left_img_data);
-                //cv::Mat img_C2 = Mat(height, width, CV_8UC1, right_img_data);
-                cv::Mat img_C1 = cv::imread(leftImgPath, cv::IMREAD_GRAYSCALE);
-                cv::Mat img_C2 = cv::imread(rightImgPath, cv::IMREAD_GRAYSCALE);
-                cv::Size sz1 = img_C1.size();
-                cv::Size sz2 = img_C2.size();
-
                 // Create combined matrix
-                cv::Mat im3(sz1.height + sz2.height + 5, sz1.width, CV_8UC1);
-                cv::Mat left(im3, cv::Rect(0, 0, sz1.width, sz1.height));
+                cv::Mat im3(2*refImageSize.height + 5, refImageSize.width, CV_8UC1);
+                cv::Mat left(im3, cv::Rect(0, 0, refImageSize.width, refImageSize.height));
                 img_C1.copyTo(left);
-                cv::Mat right(im3, cv::Rect(0, sz1.height + 5, sz2.width, sz2.height));
+                cv::Mat right(im3, cv::Rect(0, refImageSize.height + 5, refImageSize.width, refImageSize.height));
                 img_C2.copyTo(right);
 
                 // Convert to color type
@@ -188,7 +179,7 @@ int main(){
                     // Add to image
                     cv::Point2f pt_left(match.u1c, match.v1c);
                     cv::circle(im3, pt_left, 2, color);
-                    cv::Point2f pt_right(match.u2c, match.v2c + (sz1.height + 5));
+                    cv::Point2f pt_right(match.u2c, match.v2c + (refImageSize.height + 5));
                     cv::circle(im3, pt_right, 2, color);
                 }
 
@@ -196,31 +187,18 @@ int main(){
                 cv::imshow("Stereo Gray Image", im3);
                 cv::waitKey(10);
 
-                // Free the data once done
-                im3.release();
-
-                // Done delete them
-                // Memory will grow unbounded otherwise
-                img_C1.release();
-                img_C2.release();
-
             } else if(i == 0) {
                 std::cout << std::endl;
             } else {
                 std::cerr << " ... failed!" << std::endl;
             }
 
-
             // catch image read errors here
         } catch (...) {
             std::cerr << "ERROR: Couldn't read input files!" << std::endl;
             return 1;
         }
-    } //end for(int32_t i = 0; i < 4500; i++)
-
-    // release uint8_t buffers
-    free(left_img_data);
-    free(right_img_data);
+    } //end for
 
 
     // Stop the visualization thread if it was running
@@ -234,3 +212,87 @@ int main(){
 
 	return 0;
 }
+
+void loadImages(const bfs::path &sequenceDirPath, std::vector<bfs::path> &leftImageFileNames,
+                std::vector<bfs::path> &rightImageFileNames) {
+    if(!bfs::is_directory(sequenceDirPath)) {
+        std::cerr << sequenceDirPath << " is not a directory." << std::endl;
+        return;
+    }
+    std::cout << "Looking for images in " << sequenceDirPath << std::endl;
+
+    bfs::path leftImageDirPath = sequenceDirPath / "image_0";
+    bfs::path rightImageDirPath = sequenceDirPath / "image_1";
+
+    if(!bfs::is_directory(leftImageDirPath)) {
+        std::cerr << leftImageDirPath << " is not a directory" << std::endl;
+        return;
+    } else if(!bfs::is_directory(rightImageDirPath)) {
+        std::cerr << rightImageDirPath << " is not a directory" << std::endl;
+        return;
+    }
+
+    for(auto& fileName: bfs::directory_iterator(leftImageDirPath)) {
+        if(fileName.path().extension() == ".png") {
+            leftImageFileNames.emplace_back(fileName);
+        } else {
+            std::cerr << fileName << " is not an image" << std::endl;
+        }
+    }
+
+    for(auto& fileName: bfs::directory_iterator(rightImageDirPath)) {
+        if(fileName.path().extension() == ".png") {
+            rightImageFileNames.emplace_back(fileName);
+        } else {
+            std::cerr << fileName << " is not an image" << std::endl;
+        }
+    }
+
+    if(leftImageFileNames.size() != rightImageFileNames.size()) {
+        std::cerr << "The left and right image directories contains unequal amounts of images." << std::endl;
+    }
+
+    std::sort(leftImageFileNames.begin(), leftImageFileNames.end());
+    std::sort(rightImageFileNames.begin(), rightImageFileNames.end());
+
+}
+
+void loadTimeStamps(const bfs::path &timeStampsFileName, std::vector<double> &timeStamps) {
+
+    if(!bfs::is_regular_file(timeStampsFileName)) {
+        std::cerr << timeStampsFileName << " is not a file." << std::endl;
+        return;
+    }
+
+    std::ifstream fTimes;
+    fTimes.open(timeStampsFileName.c_str());
+
+    while(!fTimes.eof()) {
+        std::string s;
+        getline(fTimes,s);
+        if(!s.empty()) {
+            std::stringstream ss;
+            ss << s;
+            double t;
+            ss >> t;
+            timeStamps.push_back(t);
+        }
+    }
+}
+
+void loadGtPoses(std::string gtPosesFileName) {
+    std::cout << "Path to ground truth poses: " << gtPosesFileName << std::endl;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -87,7 +87,7 @@ target_link_libraries(SFO_main
         gtsam
 #        tbb
 #        tbbmalloc
-        png
+#        png
 #        GL
         ${GTSAM_LIBS}
 #        ${PCL_LIBRARIES}
