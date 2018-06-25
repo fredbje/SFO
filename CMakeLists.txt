@@ -48,6 +48,7 @@ set(CMAKE_BUILD_TYPE Debug)
 
 # Include our header files
 include_directories(
+        include
         ${Pangolin_INCLUDE_DIR}
 #        ${X11_INCLUDE_DIRS}
         thirdparty
@@ -71,17 +72,19 @@ file(GLOB_RECURSE sources_thirdparty thirdparty/*.cpp)
 set(sources_SFO
     src/drawer.cpp
     src/stereo.cpp
+    src/system.cpp
+    src/viewer.cpp
 )
 
 
 # Create the main executable, and link libraries
-add_executable(SFO_main
-        src/SFO_main.cpp
+add_executable(kitti-example
+        examples/kitti-example.cpp
         ${sources_SFO}
         ${sources_thirdparty}
 )
 
-target_link_libraries(SFO_main
+target_link_libraries(kitti-example
 #        X11
         ${Pangolin_LIBRARY}
         gtsam

@@ -1,20 +1,33 @@
+#include <opencv2/core/persistence.hpp> // cv::FileStorage
+#include <opencv/cv.hpp>
+#include <libviso2/matcher.h>
+
 #include "drawer.h"
 
 namespace SFO {
 
-    Drawer::Drawer() {
+    Drawer::Drawer(libviso2::VisualOdometryStereo *pViso, const std::string &strSettingPath) : mpViso(pViso) {
+
+        cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
+
+        mKeyFrameSize = fSettings["Viewer.KeyFrameSize"];
+        mKeyFrameLineWidth = fSettings["Viewer.KeyFrameLineWidth"];
+        mGraphLineWidth = fSettings["Viewer.GraphLineWidth"];
+        mPointSize = fSettings["Viewer.PointSize"];
+        mCameraSize = fSettings["Viewer.CameraSize"];
+        mCameraLineWidth = fSettings["Viewer.CameraLineWidth"];
 
         // Set default values
-        this->mptrPose = new std::vector<libviso2::Matrix>();
-        this->mptrPoselib = new std::vector<libviso2::Matrix>();
-        this->mptrPoseTruth = new std::vector<libviso2::Matrix>();
+        this->mpvPoseGtsam = new std::vector<libviso2::Matrix>();
+        this->mpvPoseLibviso2 = new std::vector<libviso2::Matrix>();
+        this->mpvPoseGT = new std::vector<libviso2::Matrix>();
         //this->mPose = vptrPose->at(0);
 
         // Start the render thread
         //boost::thread t(boost::bind(&drawer::start, this));
     }
 
-
+/*
     Drawer::Drawer(std::string gtPosesFileName) : Drawer() {
         libviso2::Matrix tempPose(4,4);
         double r11,r12,r13,r21,r22,r23,r31,r32,r33;
@@ -58,6 +71,7 @@ namespace SFO {
         }
         std::cout << "Finished loading GT poses. Number of poses loaded: " << mptrPoseTruth->size() << std::endl;
     }
+    */
 
     Drawer::~Drawer() {
         //delete this->mptrPose;
@@ -65,8 +79,60 @@ namespace SFO {
         //delete this->mptrPoseTruth;
     }
 
+    void Drawer::setCurrentCameraPose(const cv::Mat &Tcw) {
+        std::unique_lock<std::mutex> lock(mMutexCamera);
+        mCameraPose = Tcw.clone();
+    }
 
-    void Drawer::updatePoses(std::vector<libviso2::Matrix>* gtsamPoseVec) {
+    cv::Mat Drawer::drawFrame(){
+        // Vector of structs p_match for storing matches.
+        std::vector<libviso2::Matcher::p_match> vMatches = mpViso->getMatches();
+        std::vector<int32_t> vInliers = mpViso->getInlierIndices();
+
+        // output some statistics
+        double nMatches = mpViso->getNumberOfMatches();
+        double nInliers = mpViso->getNumberOfInliers();
+        std::cout << ", Matches: " << std::fixed << std::setprecision(0) << nMatches;
+        std::cout << ", Inliers: " << std::fixed << std::setprecision(2)
+                  << 100.0 * nInliers / nMatches << " %" << std::endl;
+
+        // Create combined matrix
+        cv::Mat im3(2*mImLeft.size().height + 5, mImLeft.size().width, CV_8UC1);
+        cv::Mat left(im3, cv::Rect(0, 0, mImLeft.size().width, mImLeft.size().height));
+        mImLeft.copyTo(left);
+        cv::Mat right(im3, cv::Rect(0, mImRight.size().height + 5, mImRight.size().width, mImRight.size().height));
+        mImRight.copyTo(right);
+
+        // Convert to color type
+        cv::cvtColor(im3, im3, CV_GRAY2RGB);
+
+        // ==============================
+        // Add extracted features to mat
+        // ==============================
+        for (std::size_t ki = 0; ki < vMatches.size(); ki++) {
+            // Get match data
+            libviso2::Matcher::p_match match;
+            match = vMatches.at(ki);
+            // Point color object
+            cv::Scalar color;
+            // Check to see if inlier, if so color it as one
+            // The outliers are red
+            if (std::find(vInliers.begin(), vInliers.end(), ki) != vInliers.end()) {
+                color = CV_RGB(0, 255, 255);
+            } else {
+                color = CV_RGB(255, 0, 0);
+            }
+            // Add to image
+            cv::Point2f pt_left(match.u1c, match.v1c);
+            cv::circle(im3, pt_left, 2, color);
+            cv::Point2f pt_right(match.u2c, match.v2c + (mImLeft.size().height + 5));
+            cv::circle(im3, pt_right, 2, color);
+        }
+        return im3;
+    }
+
+
+   /* void Drawer::updatePoses(std::vector<libviso2::Matrix>* gtsamPoseVec) {
 
         // TODO: Lock the variable
 
@@ -81,18 +147,22 @@ namespace SFO {
         //cout << "Array after: " << mptrPose->size() << endl;
 
     }
-
-
+*/
     void Drawer::updatePoseslib(std::vector<libviso2::Matrix>* libviso2PoseVec) {
-        mptrPoselib->insert(mptrPoselib->end(), libviso2PoseVec->begin() + mptrPoselib->size(), libviso2PoseVec->end());
+        mpvPoseLibviso2->insert(mpvPoseLibviso2->end(), libviso2PoseVec->begin() + mpvPoseLibviso2->size(), libviso2PoseVec->end());
+    }
+
+    void Drawer::updateImages(const cv::Mat &imLeft, const cv::Mat &imRight) {
+        imLeft.copyTo(mImLeft);
+        imRight.copyTo(mImRight);
     }
 
     void Drawer::drawCurrentCamera(pangolin::OpenGlMatrix &Twc) {
         float CameraSize = 0.5;
         float mCameraLineWidth = 1;
         const float &w = CameraSize;
-        const float h = (float)(w*0.75);
-        const float z = (float)(w*0.6);
+        const auto h = (float)(w*0.75);
+        const auto z = (float)(w*0.6);
 
         glPushMatrix();
         glMultMatrixd(Twc.m);
@@ -129,8 +199,8 @@ namespace SFO {
         float CameraSize = 0.5;
         float mCameraLineWidth = 1;
         const float &w = CameraSize;
-        const float h = (float)(w*0.75);
-        const float z = (float)(w*0.6);
+        const auto h = (float)(w*0.75);
+        const auto z = (float)(w*0.6);
 
         glPushMatrix();
         glMultMatrixd(Twc.m);
@@ -167,8 +237,8 @@ namespace SFO {
         float CameraSize = 0.5;
         float mCameraLineWidth = 1;
         const float &w = CameraSize;
-        const float h = (float)(w*0.75);
-        const float z = (float)(w*0.6);
+        const auto h = (float)(w*0.75);
+        const auto z = (float)(w*0.6);
 
         glPushMatrix();
         glMultMatrixd(Twc.m);
@@ -267,7 +337,7 @@ namespace SFO {
 
 
             // Skip if there are no poses
-            if(mptrPose->empty()) {
+            if(mpvPoseLibviso2->empty()) {
                 continue;
             }
 
@@ -294,17 +364,17 @@ namespace SFO {
             //DrawCurrentCameraBlue(Twtruth);
 
             // Draw current frame
-            for(std::size_t i = 1; i < mptrPose->size(); i++) {
+            for(std::size_t i = 1; i < mpvPoseLibviso2->size(); i++) {
                 // Get new pose
-                Tw1 = get_matrix(mptrPose->at(i-1));
-                Tw2 = get_matrix(mptrPose->at(i));
+               // Tw1 = get_matrix(mptrPose->at(i-1));
+                //Tw2 = get_matrix(mptrPose->at(i));
                 // Draw the camera that is not drawn yet
-                drawCurrentCamera(Tw2);
+               // drawCurrentCamera(Tw2);
 
-                Twtruth = get_matrix(mptrPoseTruth->at(i));
-                drawCurrentCameraRed(Twtruth);
+                //Twtruth = get_matrix(mptrPoseTruth->at(i));
+                //drawCurrentCameraRed(Twtruth);
 
-                Twc = get_matrix(mptrPoselib->at(i));
+                Twc = get_matrix(mpvPoseLibviso2->at(i));
                 drawCurrentCameraBlue(Twc);
                 // Draw line between the two
                 float mLineSize = 3;
@@ -320,6 +390,43 @@ namespace SFO {
             pangolin::FinishFrame();
         }
 
+    }
+
+
+    void Drawer::getCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M)
+    {
+        if(!mCameraPose.empty())
+        {
+            cv::Mat Rwc(3, 3, CV_32F);
+            cv::Mat twc(3, 1, CV_32F);
+            {
+                std::unique_lock<std::mutex> lock(mMutexCamera);
+                Rwc = mCameraPose.rowRange(0,3).colRange(0,3).t();
+                twc = -Rwc*mCameraPose.rowRange(0,3).col(3);
+            }
+
+            M.m[0] = Rwc.at<float>(0,0);
+            M.m[1] = Rwc.at<float>(1,0);
+            M.m[2] = Rwc.at<float>(2,0);
+            M.m[3]  = 0.0;
+
+            M.m[4] = Rwc.at<float>(0,1);
+            M.m[5] = Rwc.at<float>(1,1);
+            M.m[6] = Rwc.at<float>(2,1);
+            M.m[7]  = 0.0;
+
+            M.m[8] = Rwc.at<float>(0,2);
+            M.m[9] = Rwc.at<float>(1,2);
+            M.m[10] = Rwc.at<float>(2,2);
+            M.m[11]  = 0.0;
+
+            M.m[12] = twc.at<float>(0);
+            M.m[13] = twc.at<float>(1);
+            M.m[14] = twc.at<float>(2);
+            M.m[15]  = 1.0;
+        }
+        else
+            M.SetIdentity();
     }
 }
 
