@@ -3,6 +3,7 @@
 
 #include <string>
 #include <iostream>
+#include <mutex>
 #include <Eigen/Eigen>
 #include <boost/thread.hpp>
 
@@ -19,26 +20,27 @@ namespace SFO {
     class Drawer{
     public:
 
-        // Default constructor
         Drawer();
 
-        Drawer(std::string gtPosesFileName);
+        Drawer(const std::vector<libviso2::Matrix> &vGtPoses);
 
         ~Drawer();
 
         // Updates the local copy of poses
-        void updatePoses(std::vector<libviso2::Matrix>* gtsamPoseVec);
-        void updatePoseslib(std::vector<libviso2::Matrix>* libviso2PoseVec);
+        void updateGtsamPoses(std::vector<libviso2::Matrix> *pvGtsamPoses);
+        void updateLibviso2Poses(std::vector<libviso2::Matrix> *pvLibviso2Poses);
 
         // Start the pangolin viewer
         // Will continue to run, till it is exited
         void start();
 
+        void requestFinish();
+
     private:
         libviso2::Matrix mPose;
-        std::vector<libviso2::Matrix>* mptrPose;
-        std::vector<libviso2::Matrix>* mptrPoselib;
-        std::vector<libviso2::Matrix>* mptrPoseTruth;
+        std::vector<libviso2::Matrix> *mptrPose;
+        std::vector<libviso2::Matrix> *mptrPoselib;
+        std::vector<libviso2::Matrix> *mptrPoseTruth;
         // features
 
         // Private function to draw current frame
@@ -50,6 +52,11 @@ namespace SFO {
 
         // Return global translation matrix
         pangolin::OpenGlMatrix get_matrix(libviso2::Matrix pose);
+
+        bool checkFinish();
+        bool mbFinishRequested = false;
+        std::mutex mMutexFinish;
+
 
     };
 

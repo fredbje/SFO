@@ -48,6 +48,7 @@ set(CMAKE_BUILD_TYPE Debug)
 
 # Include our header files
 include_directories(
+        include
         ${Pangolin_INCLUDE_DIR}
 #        ${X11_INCLUDE_DIRS}
         thirdparty
@@ -75,13 +76,13 @@ set(sources_SFO
 
 
 # Create the main executable, and link libraries
-add_executable(SFO_main
-        src/SFO_main.cpp
+add_executable(kitti-stereo
+        examples/kitti-stereo.cpp
         ${sources_SFO}
         ${sources_thirdparty}
 )
 
-target_link_libraries(SFO_main
+target_link_libraries(kitti-stereo
 #        X11
         ${Pangolin_LIBRARY}
         gtsam

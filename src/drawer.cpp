@@ -4,88 +4,31 @@
 namespace SFO {
 
     Drawer::Drawer() {
-
-        // Set default values
         this->mptrPose = new std::vector<libviso2::Matrix>();
         this->mptrPoselib = new std::vector<libviso2::Matrix>();
         this->mptrPoseTruth = new std::vector<libviso2::Matrix>();
-        //this->mPose = vptrPose->at(0);
-
-        // Start the render thread
-        //boost::thread t(boost::bind(&drawer::start, this));
     }
 
 
-    Drawer::Drawer(std::string gtPosesFileName) : Drawer() {
-        libviso2::Matrix tempPose(4,4);
-        double r11,r12,r13,r21,r22,r23,r31,r32,r33;
-        double t1,t2,t3;
-
-        std::ifstream gtPosesFile;
-        std::string temp_state;
-        
-        gtPosesFile.open(gtPosesFileName.c_str(), std::ifstream::in);
-        if(!gtPosesFile.is_open()){
-            std::cerr << "Error, could not open ground truth pose file!" << std::endl;
-        }
-
-        std::cout << "Loading ground truth poses.." << std::endl;
-        while(!gtPosesFile.eof()) {
-            // Read in next line
-            std::getline(gtPosesFile, temp_state);
-            std::sscanf(temp_state.c_str(), "%le %le %le %le %le %le %le %le %le %le %le %le",
-                   &r11,&r12,&r13,&t1,&r21,&r22,&r23,&t2,&r31,&r32,&r33,&t3);
-
-            if(temp_state.empty()){break;}
-
-            // Create clone state
-            tempPose.val[0][0] = r11;
-            tempPose.val[0][1] = r12;
-            tempPose.val[0][2] = r13;
-            tempPose.val[0][3] = t1;
-            tempPose.val[1][0] = r21;
-            tempPose.val[1][1] = r22;
-            tempPose.val[1][2] = r23;
-            tempPose.val[1][3] = t2;
-            tempPose.val[2][0] = r31;
-            tempPose.val[2][1] = r32;
-            tempPose.val[2][2] = r33;
-            tempPose.val[2][3] = t3;
-            tempPose.val[3][0] = 0;
-            tempPose.val[3][1] = 0;
-            tempPose.val[3][2] = 0;
-            tempPose.val[3][3] = 1;
-            mptrPoseTruth->push_back(tempPose);
-        }
-        std::cout << "Finished loading GT poses. Number of poses loaded: " << mptrPoseTruth->size() << std::endl;
+    Drawer::Drawer(const std::vector<libviso2::Matrix> &vGtPoses) : Drawer() {
+        *mptrPoseTruth = vGtPoses;
     }
 
     Drawer::~Drawer() {
-        //delete this->mptrPose;
-        //delete this->mptrPoselib;
-        //delete this->mptrPoseTruth;
+        //delete mptrPose;
+        //delete mptrPoselib;
+        //delete mptrPoseTruth;
     }
 
 
-    void Drawer::updatePoses(std::vector<libviso2::Matrix>* gtsamPoseVec) {
-
+    void Drawer::updateGtsamPoses(std::vector<libviso2::Matrix> *pvGtsamPoses) {
         // TODO: Lock the variable
-
-        // Debug
-        //cout << "Array before: " << mptrPose->size() << endl;
-
-        // Next copy over the new poses
-
-        mptrPose->insert(mptrPose->end(), gtsamPoseVec->begin() + mptrPose->size(), gtsamPoseVec->end());
-
-        // Debug
-        //cout << "Array after: " << mptrPose->size() << endl;
-
+        mptrPose->insert(mptrPose->end(), pvGtsamPoses->begin() + mptrPose->size(), pvGtsamPoses->end());
     }
 
 
-    void Drawer::updatePoseslib(std::vector<libviso2::Matrix>* libviso2PoseVec) {
-        mptrPoselib->insert(mptrPoselib->end(), libviso2PoseVec->begin() + mptrPoselib->size(), libviso2PoseVec->end());
+    void Drawer::updateLibviso2Poses(std::vector<libviso2::Matrix> *pvLibviso2Poses) {
+        mptrPoselib->insert(mptrPoselib->end(), pvLibviso2Poses->begin() + mptrPoselib->size(), pvLibviso2Poses->end());
     }
 
 
@@ -234,12 +177,22 @@ namespace SFO {
 
     }
 
+
+    void Drawer::requestFinish() {
+        std::unique_lock<std::mutex> lock(mMutexFinish);
+        mbFinishRequested = true;
+    }
+
+    bool Drawer::checkFinish() {
+        std::unique_lock<std::mutex> lock(mMutexFinish);
+        return mbFinishRequested;
+    }
+
     void Drawer::start() {
 
         pangolin::CreateWindowAndBind("Stereo Visual Odometry: Pose Viewer", 1024, 768);
         glEnable(GL_DEPTH_TEST);
 
-        // Defind vars
         double mViewpointX = 10.0;
         double mViewpointY = 10.0;
         double mViewpointZ = 100.0;
@@ -260,7 +213,7 @@ namespace SFO {
         pangolin::OpenGlMatrix Twc;
         Twc.SetIdentity();
 
-        while(!pangolin::ShouldQuit()) {
+        while(1) {
 
             // Set boot interupt point
             boost::this_thread::interruption_point();
@@ -321,8 +274,11 @@ namespace SFO {
 
             // Swap frames and Process Events
             pangolin::FinishFrame();
-        }
 
+            if(checkFinish()) {
+                break;
+            }
+        }
     }
 }
 
