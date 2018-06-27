@@ -2,30 +2,33 @@
 #include<iomanip>
 #include<thread>
 
-#include<Eigen/Core>
+//#include<Eigen/Core>
 
-#include <boost/lambda/lambda.hpp>
-#include <boost/thread.hpp>
+//#include <boost/lambda/lambda.hpp>
+//#include <boost/thread.hpp>
 #include <boost/filesystem.hpp>
 
-#include <png++/png.hpp>
+//#include <png++/png.hpp>
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui.hpp>
+//#include <opencv2/core/core.hpp> // Mat, probably included from frameDrawer.h
+#include <opencv2/highgui.hpp> // imshow
 //#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
+//#include <opencv2/imgproc.hpp>
 
-#include "libviso2/matrix.h"
+//#include "libviso2/matrix.h" // included from drawer.h
 #include "libviso2/viso_stereo.h"
 
 //#include "GeographicLib/Config.h"
 
 #include "stereo.h"
 #include "drawer.h"
+#include "frameDrawer.h"
 
 
-void loadImages(const std::string &strSequenceDir, std::vector<std::string> &vstrLeftImages,
+void loadImageFileNames(const std::string &strSequenceDir, std::vector<std::string> &vstrLeftImages,
                 std::vector<std::string> &vstrRightImages);
+void readImages(cv::Mat &imgLeft, cv::Mat &imgRight, const std::string &strLeftImage,
+                const std::string &strRightImage, const cv::Size &szRefSize);
 void loadTimeStamps(const std::string &strTimestampsFile, std::vector<double> &vTimestamps);
 void loadGtPoses(const std::string &strGtPosesFile, std::vector<libviso2::Matrix> &vGtPoses);
 
@@ -43,7 +46,7 @@ int main(int argc, char **argv){
 
     std::vector<std::string> vstrLeftImages;
     std::vector<std::string> vstrRightImages;
-    loadImages(strSequenceDir, vstrLeftImages, vstrRightImages);
+    loadImageFileNames(strSequenceDir, vstrLeftImages, vstrRightImages);
 
     cv::FileStorage fSettings(strSettingsFile, cv::FileStorage::READ);
 
@@ -59,7 +62,7 @@ int main(int argc, char **argv){
     float base = bf/fx;                // baseline in meters
     float s = 0;                       // shear
 
-    cv::Size szImSize(fSettings["Camera.width"], fSettings["Camera.height"]);
+    cv::Size szImgSize(fSettings["Camera.width"], fSettings["Camera.height"]);
 
     float fps = fSettings["Camera.fps"];
     double T = (fps < 1) ? 1/30 : 1/fps;
@@ -100,7 +103,7 @@ int main(int argc, char **argv){
 
     //// For display the pose, begin the thread
     // init the drawer
-    auto *pDrawer = new SFO::Drawer(vGtPoses);
+    auto *pDrawer = new SFO::Drawer(strSettingsFile, vGtPoses);
     // Start the drawer thread
     //boost::thread tDrawer(boost::bind(&SFO::Drawer::start, poseDrawer));
     std::thread tDrawer(&SFO::Drawer::start, pDrawer);
@@ -112,42 +115,29 @@ int main(int argc, char **argv){
     libviso2::Matrix libviso2Pose = libviso2::Matrix::eye(4);
 
     ////// the third pointer
-    auto *pvGtsamPoses = new std::vector<libviso2::Matrix>();
-    auto *pvLibviso2Poses = new std::vector<libviso2::Matrix>();
+    std::vector<libviso2::Matrix> vGtsamPoses;
+    std::vector<libviso2::Matrix> vLibviso2Poses;
 
-    pvGtsamPoses->push_back(gtsamPose);
-    pvLibviso2Poses->push_back(libviso2Pose);
+    vGtsamPoses.push_back(gtsamPose);
+    vLibviso2Poses.push_back(libviso2Pose);
 
-    pDrawer->updateGtsamPoses(pvGtsamPoses);
-    pDrawer->updateLibviso2Poses(pvLibviso2Poses);
+    pDrawer->updateGtsamPoses(vGtsamPoses);
+    pDrawer->updateLibviso2Poses(vLibviso2Poses);
 
-    cv::Mat imgLeft(szImSize, CV_8UC1);
-    cv::Mat imgRight(szImSize, CV_8UC1);
-    cv::Mat imgDisplay(2*szImSize.height + 5, szImSize.width, CV_8UC3);
-    cv::Mat imgDisplayUpper(imgDisplay, cv::Rect(0, 0, szImSize.width, szImSize.height));
-    cv::Mat imgDisplayLower(imgDisplay, cv::Rect(0, szImSize.height + 5, szImSize.width, szImSize.height));
-    for (std::size_t i = 0; i < 50/*vstrLeftImages.size()*/; i++) { // 4541 images
+    cv::Mat imgLeft(szImgSize, CV_8UC1);
+    cv::Mat imgRight(szImgSize, CV_8UC1);
+    //cv::namedWindow("SFO: Current Frame");
+    SFO::FrameDrawer frameDrawer(pViso, szImgSize);
 
-        imgLeft = cv::imread(vstrLeftImages[i], cv::IMREAD_GRAYSCALE);
-        imgRight = cv::imread(vstrRightImages[i], cv::IMREAD_GRAYSCALE);
+    for (std::size_t i = 0; i < 500/*vstrLeftImages.size()*/; i++) { // 4541 images
 
-        if (imgLeft.empty()) {
-            std::cerr << "Couldn't read image from" << vstrLeftImages[i] << std::endl;
-            return 1;
-        } else if(imgRight.empty()) {
-            std::cerr << "Couldn't read image from" << vstrRightImages[i] << std::endl;
-            return 1;
-        }
-
-        if(imgLeft.size() != szImSize || imgRight.size() != szImSize) {
-            std::cout << "Error, images have different size than specified in settings file." << std::endl;
-        }
+        readImages(imgLeft, imgRight, vstrLeftImages[i], vstrRightImages[i], szImgSize);
 
         std::cout << "Processing: Frame: " << std::setw(4) << i;
 
-        std::int32_t dims[] = {static_cast<std::int32_t>(szImSize.width),
-                               static_cast<std::int32_t>(szImSize.height),
-                               static_cast<std::int32_t>(szImSize.width)};
+        std::int32_t dims[] = {static_cast<std::int32_t>(szImgSize.width),
+                               static_cast<std::int32_t>(szImgSize.height),
+                               static_cast<std::int32_t>(szImgSize.width)};
         if (pViso->process(imgLeft.data, imgRight.data, dims)) {
             vMatches.clear();
             vInliers.clear();
@@ -163,41 +153,16 @@ int main(int argc, char **argv){
             SFO::localOptimization(vMatches, vInliers, poseInit, param, sigmaPixel, K, model, poseOpt);
 
             gtsamPose = gtsamPose * (poseOpt);
-            pvGtsamPoses->push_back(gtsamPose);
+            vGtsamPoses.push_back(gtsamPose);
 
             libviso2Pose = libviso2Pose * libviso2::Matrix::inv(pViso->getMotion());
-            pvLibviso2Poses->push_back(libviso2Pose);
+            vLibviso2Poses.push_back(libviso2Pose);
 
-            // output some statistics
-            int nMatches = pViso->getNumberOfMatches();
-            int nInliers = pViso->getNumberOfInliers();
-            std::cout << ", Matches: " << std::fixed << std::setprecision(0) << nMatches;
-            std::cout << ", Inliers: " << std::fixed << std::setprecision(2)
-                      << 100.0*nInliers/nMatches << " %" << std::endl;
-
-            pDrawer->updateGtsamPoses(pvGtsamPoses);
-            pDrawer->updateLibviso2Poses(pvLibviso2Poses);
-
-            // Convert to color type
-            cv::cvtColor(imgLeft, imgDisplayUpper, CV_GRAY2RGB);
-            cv::cvtColor(imgRight, imgDisplayLower, CV_GRAY2RGB);
-
-            // Add extracted features to mat
-            for (std::size_t j = 0; j < vMatches.size(); j++) {
-                cv::Scalar color;
-                if (std::find(vInliers.begin(), vInliers.end(), j) != vInliers.end()) {
-                    color = CV_RGB(0, 255, 255);
-                } else {
-                    color = CV_RGB(255, 0, 0);
-                }
-                libviso2::Matcher::p_match match = vMatches.at(j);
-                cv::Point2f pt_left(match.u1c, match.v1c);
-                cv::circle(imgDisplayUpper, pt_left, 2, color);
-                cv::Point2f pt_right(match.u2c, match.v2c);
-                cv::circle(imgDisplayLower, pt_right, 2, color);
-            }
-
-            cv::imshow("Stereo Gray Image", imgDisplay);
+            pDrawer->updateGtsamPoses(vGtsamPoses);
+            pDrawer->updateLibviso2Poses(vLibviso2Poses);
+            
+            frameDrawer.update(imgLeft, imgRight);
+            cv::imshow("SFO: Current Frame", frameDrawer.drawFrame());
             cv::waitKey(static_cast<int>(T*1e3));
 
         } else if(i == 0) {
@@ -211,9 +176,7 @@ int main(int argc, char **argv){
     tDrawer.join();
 
     delete pDrawer;
-    delete pvGtsamPoses;
-    delete pvLibviso2Poses;
-    //delete pViso;
+    delete pViso;
 
     std::cout << "SFO_main complete! Exiting ..." << std::endl;
 
@@ -222,7 +185,24 @@ int main(int argc, char **argv){
 
 namespace bfs = boost::filesystem;
 
-void loadImages(const std::string &strSequenceDir, std::vector<std::string> &vstrLeftImages,
+void readImages(cv::Mat &imgLeft, cv::Mat &imgRight, const std::string &strLeftImage,
+                const std::string &strRightImage, const cv::Size &szRefSize) {
+    imgLeft = cv::imread(strLeftImage, cv::IMREAD_GRAYSCALE);
+    imgRight = cv::imread(strRightImage, cv::IMREAD_GRAYSCALE);
+
+    if (imgLeft.empty()) {
+        std::cerr << "Couldn't read image from" << strLeftImage << std::endl;
+    } else if(imgRight.empty()) {
+        std::cerr << "Couldn't read image from" << strRightImage << std::endl;
+    }
+
+    if(imgLeft.size() != szRefSize || imgRight.size() != szRefSize) {
+        std::cout << "Error, images have different size than specified in settings file." << std::endl;
+    }
+
+}
+
+void loadImageFileNames(const std::string &strSequenceDir, std::vector<std::string> &vstrLeftImages,
                 std::vector<std::string> &vstrRightImages) {
     if(!bfs::is_directory(strSequenceDir)) {
         std::cerr << strSequenceDir << " is not a directory." << std::endl;
