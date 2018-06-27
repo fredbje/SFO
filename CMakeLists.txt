@@ -72,6 +72,7 @@ file(GLOB_RECURSE sources_thirdparty thirdparty/*.cpp)
 set(sources_SFO
     src/drawer.cpp
     src/stereo.cpp
+    src/frameDrawer.cpp
 )
 
 
