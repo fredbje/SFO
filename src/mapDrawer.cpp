@@ -1,35 +1,45 @@
-#include "drawer.h"
-//#include <libviso2/matrix.h>
+#include <opencv2/core/persistence.hpp>
+#include "mapDrawer.h"
 
 namespace SFO {
 
-    Drawer::Drawer() {
+    MapDrawer::MapDrawer(const std::string &strSettingsFile) {
+        cv::FileStorage fSettings(strSettingsFile, cv::FileStorage::READ);
+        if (!fSettings.isOpened()) {
+            std::cerr << "Failed to open settings file at: " << strSettingsFile << std::endl;
+        }
+        mViewpointX = fSettings["Viewer.ViewpointX"];
+        mViewpointY = fSettings["Viewer.ViewpointY"];
+        mViewpointZ = fSettings["Viewer.ViewpointZ"];
+        mViewpointF = fSettings["Viewer.ViewpointF"];
+
         mpvGtsamPoses = new std::vector<libviso2::Matrix>();
         mpvLibviso2Poses = new std::vector<libviso2::Matrix>();
         mpvGtPoses = new std::vector<libviso2::Matrix>();
     }
 
 
-    Drawer::Drawer(const std::vector<libviso2::Matrix> &vGtPoses) : Drawer() {
+    MapDrawer::MapDrawer(const std::string &strSettingsFile, const std::vector<libviso2::Matrix> &vGtPoses)
+            : MapDrawer(strSettingsFile) {
         *mpvGtPoses = vGtPoses;
     }
 
-    Drawer::~Drawer() {
+    MapDrawer::~MapDrawer() {
         delete mpvGtsamPoses;
         delete mpvLibviso2Poses;
         delete mpvGtPoses;
     }
 
-    void Drawer::updateGtsamPoses(std::vector<libviso2::Matrix> *pvGtsamPoses) {
+    void MapDrawer::updateGtsamPoses(std::vector<libviso2::Matrix> *pvGtsamPoses) {
         // TODO: Lock the variable
         mpvGtsamPoses->insert(mpvGtsamPoses->end(), pvGtsamPoses->begin() + mpvGtsamPoses->size(), pvGtsamPoses->end());
     }
 
-    void Drawer::updateLibviso2Poses(std::vector<libviso2::Matrix> *pvLibviso2Poses) {
+    void MapDrawer::updateLibviso2Poses(std::vector<libviso2::Matrix> *pvLibviso2Poses) {
         mpvLibviso2Poses->insert(mpvLibviso2Poses->end(), pvLibviso2Poses->begin() + mpvLibviso2Poses->size(), pvLibviso2Poses->end());
     }
     
-    void Drawer::drawCamera(pangolin::OpenGlMatrix &Twc, Color color) {
+    void MapDrawer::drawCamera(pangolin::OpenGlMatrix &Twc, Color color) {
         float CameraSize = 0.5;
         float mCameraLineWidth = 1;
         const float &w = CameraSize;
@@ -74,7 +84,7 @@ namespace SFO {
         glPopMatrix();
     }
 
-    pangolin::OpenGlMatrix Drawer::getOpenGlMatrix(libviso2::Matrix pose) {
+    pangolin::OpenGlMatrix MapDrawer::getOpenGlMatrix(libviso2::Matrix pose) {
         pangolin::OpenGlMatrix Twc;
         Twc.m[ 0] = pose.val[0][0];
         Twc.m[ 1] = pose.val[1][0];
@@ -95,23 +105,18 @@ namespace SFO {
         return Twc;
     }
 
-    void Drawer::requestFinish() {
+    void MapDrawer::requestFinish() {
         std::unique_lock<std::mutex> lock(mMutexFinish);
         mbFinishRequested = true;
     }
 
-    bool Drawer::checkFinish() {
+    bool MapDrawer::checkFinish() {
         std::unique_lock<std::mutex> lock(mMutexFinish);
         return mbFinishRequested;
     }
 
     // TODO Make it possible to option out viewing different poses and graphs.
-    void Drawer::start() {
-        double mViewpointX = 10.0;
-        double mViewpointY = 10.0;
-        double mViewpointZ = 100.0;
-        double mViewpointF = 400;
-
+    void MapDrawer::start() {
         pangolin::CreateWindowAndBind("Pose Viewer", 1024, 768);
         glEnable(GL_DEPTH_TEST);
 
@@ -181,24 +186,29 @@ namespace SFO {
             for(std::size_t i = 1; i < mpvGtsamPoses->size(); i++) {
                 Tw1Gtsam    = getOpenGlMatrix(mpvGtsamPoses->at(i-1));
                 Tw2Gtsam    = getOpenGlMatrix(mpvGtsamPoses->at(i));
-                Tw1Libviso2 = getOpenGlMatrix(mpvLibviso2Poses->at(i-1));
-                Tw2Libviso2 = getOpenGlMatrix(mpvLibviso2Poses->at(i));
-                Tw1Gt       = getOpenGlMatrix(mpvGtPoses->at(i-1));
-                Tw2Gt       = getOpenGlMatrix(mpvGtPoses->at(i));
-
                 if(i == 1) {
                     drawCamera(Tw1Gtsam, green);
-                    drawCamera(Tw1Libviso2, blue);
-                    drawCamera(Tw2Gt, red);
                 }
-
                 drawCamera(Tw2Gtsam, green);
-                drawCamera(Tw2Libviso2, blue);
-                drawCamera(Tw2Gt, red);
-
                 drawLines(Tw1Gtsam, Tw2Gtsam, green);
+
+                Tw1Libviso2 = getOpenGlMatrix(mpvLibviso2Poses->at(i-1));
+                Tw2Libviso2 = getOpenGlMatrix(mpvLibviso2Poses->at(i));
+                if(i == 1) {
+                    drawCamera(Tw1Libviso2, blue);
+                }
+                drawCamera(Tw2Libviso2, blue);
                 drawLines(Tw1Libviso2, Tw2Libviso2, blue);
-                drawLines(Tw1Gt, Tw2Gt, red);
+
+                if(!mpvGtPoses->empty()) {
+                    Tw1Gt = getOpenGlMatrix(mpvGtPoses->at(i - 1));
+                    Tw2Gt = getOpenGlMatrix(mpvGtPoses->at(i));
+                    if (i == 1) {
+                        drawCamera(Tw2Gt, red);
+                    }
+                    drawCamera(Tw2Gt, red);
+                    drawLines(Tw1Gt, Tw2Gt, red);
+                }
             }
 
             // Swap frames and Process Events
@@ -213,7 +223,7 @@ namespace SFO {
         std::cout << "Deleted handler 3D" << std::endl;
     }
     
-    void Drawer::drawLines(pangolin::OpenGlMatrix T1, pangolin::OpenGlMatrix T2, Color color) {
+    void MapDrawer::drawLines(pangolin::OpenGlMatrix T1, pangolin::OpenGlMatrix T2, Color color) {
         float mLineSize = 3;
         glLineWidth(mLineSize);
         if(color == red) {

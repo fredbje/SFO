@@ -17,14 +17,14 @@
 
 namespace SFO {
 
-    class Drawer{
+    class MapDrawer{
     public:
 
-        Drawer();
+        MapDrawer(const std::string &strSettingsFile);
 
-        Drawer(const std::vector<libviso2::Matrix> &vGtPoses);
+        MapDrawer(const std::string &strSettingsFile, const std::vector<libviso2::Matrix> &vGtPoses);
 
-        ~Drawer();
+        ~MapDrawer();
 
         void updateGtsamPoses(std::vector<libviso2::Matrix> *pvGtsamPoses);
         void updateLibviso2Poses(std::vector<libviso2::Matrix> *pvLibviso2Poses);
@@ -49,6 +49,8 @@ namespace SFO {
         std::mutex mMutexFinish;
         bool checkFinish();
         bool mbFinishRequested = false;
+
+        double mViewpointX, mViewpointY, mViewpointZ, mViewpointF;
 
 
 

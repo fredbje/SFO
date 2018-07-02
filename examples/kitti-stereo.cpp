@@ -21,7 +21,7 @@
 //#include "GeographicLib/Config.h"
 
 #include "stereo.h"
-#include "drawer.h"
+#include "mapDrawer.h"
 #include "frameDrawer.h"
 
 void loadImageFileNames(const std::string &strSequenceDir, std::vector<std::string> &vstrLeftImages,
@@ -46,6 +46,22 @@ int main(int argc, char **argv){
     std::vector<std::string> vstrLeftImages;
     std::vector<std::string> vstrRightImages;
     loadImageFileNames(strSequenceDir, vstrLeftImages, vstrRightImages);
+
+    std::vector<double> vTimestamps;
+    loadTimeStamps(strTimestampsFile, vTimestamps);
+
+    if(vTimestamps.size() != vstrLeftImages.size()) {
+        std::cerr << "Number of timestamps does not match number of images" << std::endl;
+        return 1;
+    }
+
+    std::vector<libviso2::Matrix> vGtPoses;
+    loadGtPoses(strGtPosesFile, vGtPoses);
+
+    if(vGtPoses.size() != vstrLeftImages.size()) {
+        std::cerr << "Number of GT poses does not match number of images." << std::endl;
+        return 1;
+    }
 
     cv::FileStorage fSettings(strSettingsFile, cv::FileStorage::READ);
 
@@ -81,24 +97,9 @@ int main(int argc, char **argv){
     double sigmaPixel = 2;
     const gtsam::noiseModel::Isotropic::shared_ptr model = gtsam::noiseModel::Isotropic::Sigma(3, sigmaPixel);
 
-    std::vector<double> vTimestamps;
-    loadTimeStamps(strTimestampsFile, vTimestamps);
+    auto *pDrawer = new SFO::MapDrawer(strSettingsFile, vGtPoses);
+    std::thread tDrawer(&SFO::MapDrawer::start, pDrawer);
 
-    if(vTimestamps.size() != vstrLeftImages.size()) {
-        std::cerr << "Number of timestamps does not match number of images" << std::endl;
-        return 1;
-    }
-
-    std::vector<libviso2::Matrix> vGtPoses;
-    loadGtPoses(strGtPosesFile, vGtPoses);
-
-    if(vGtPoses.size() != vstrLeftImages.size()) {
-        std::cerr << "Number of GT poses does not match number of images." << std::endl;
-        return 1;
-    }
-
-    auto *pDrawer = new SFO::Drawer(vGtPoses);
-    std::thread tDrawer(&SFO::Drawer::start, pDrawer);
 /////////////////////////////////////////////
 
     // current pose (this matrix transforms a point from the current
