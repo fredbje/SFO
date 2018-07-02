@@ -26,36 +26,32 @@ namespace SFO {
 
         ~Drawer();
 
-        // Updates the local copy of poses
         void updateGtsamPoses(std::vector<libviso2::Matrix> *pvGtsamPoses);
         void updateLibviso2Poses(std::vector<libviso2::Matrix> *pvLibviso2Poses);
 
-        // Start the pangolin viewer
-        // Will continue to run, till it is exited
         void start();
 
         void requestFinish();
 
     private:
         libviso2::Matrix mPose;
-        std::vector<libviso2::Matrix> *mptrPose;
-        std::vector<libviso2::Matrix> *mptrPoselib;
-        std::vector<libviso2::Matrix> *mptrPoseTruth;
-        // features
+        std::vector<libviso2::Matrix> *mpvGtsamPoses;
+        std::vector<libviso2::Matrix> *mpvLibviso2Poses;
+        std::vector<libviso2::Matrix> *mpvGtPoses;
 
-        // Private function to draw current frame
-        // Taken from orb_slam2
-        // https://github.com/raulmur/ORB_SLAM2/blob/master/src/MapDrawer.cc#L179-L219
-        void drawCurrentCamera(pangolin::OpenGlMatrix &Twc);
-        void drawCurrentCameraRed(pangolin::OpenGlMatrix &Twc);
-        void drawCurrentCameraBlue(pangolin::OpenGlMatrix &Twc);
+        enum Color { red, green, blue };
+        void drawCamera(pangolin::OpenGlMatrix &Twc, Color color);
+        void drawLines(pangolin::OpenGlMatrix T1, pangolin::OpenGlMatrix T2, Color color);
 
         // Return global translation matrix
-        pangolin::OpenGlMatrix get_matrix(libviso2::Matrix pose);
+        pangolin::OpenGlMatrix getOpenGlMatrix(libviso2::Matrix pose);
 
+        std::mutex mMutexFinish;
         bool checkFinish();
         bool mbFinishRequested = false;
-        std::mutex mMutexFinish;
+
+
+
 
 
     };

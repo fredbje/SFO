@@ -30,6 +30,7 @@ using namespace std;
   }
 
   VisualOdometryStereo::~VisualOdometryStereo() {
+      
   }
 
   bool VisualOdometryStereo::process (uint8_t *I1, uint8_t *I2, int32_t* dims, bool replace) {

@@ -5,9 +5,12 @@
 namespace SFO {
     FrameDrawer::FrameDrawer(libviso2::VisualOdometryStereo * const pViso, const cv::Size &szImgSize)
             : mpViso(pViso) {
-        mImgDisplay = cv::Mat(2*szImgSize.height + 5, szImgSize.width, CV_8UC3);
+        mszImgSize = szImgSize;
+        int textHeight = 20; // Actually 10, but leaving som space over and under
+        int borderHeight = 5;
+        mImgDisplay = cv::Mat(2*szImgSize.height + borderHeight + textHeight, szImgSize.width, CV_8UC3);
         mImgDisplayUpper = cv::Mat(mImgDisplay, cv::Rect(0, 0, szImgSize.width, szImgSize.height));
-        mImgDisplayLower = cv::Mat(mImgDisplay, cv::Rect(0, szImgSize.height + 5, szImgSize.width, szImgSize.height));
+        mImgDisplayLower = cv::Mat(mImgDisplay, cv::Rect(0, szImgSize.height + borderHeight, szImgSize.width, szImgSize.height));
     }
 
     void FrameDrawer::update(const cv::Mat &imgLeft, const cv::Mat &imgRight) {
@@ -21,10 +24,6 @@ namespace SFO {
     }
 
     const cv::Mat FrameDrawer::drawFrame() {
-        std::cout << ", Matches: " << std::fixed << std::setprecision(0) << mnMatches;
-        std::cout << ", Inliers: " << std::fixed << std::setprecision(2)
-                  << 100.0*mnInliers/mnMatches << " %" << std::endl;
-
         for (std::size_t j = 0; j < mvMatches.size(); j++) {
             cv::Scalar color;
             if (std::find(mvInliers.begin(), mvInliers.end(), j) != mvInliers.end()) {
@@ -38,7 +37,16 @@ namespace SFO {
             cv::Point2f pt_right(match.u2c, match.v2c);
             cv::circle(mImgDisplayLower, pt_right, 2, color);
         }
+        drawText();
         return mImgDisplay;
+    }
+
+    void FrameDrawer::drawText() {
+        std::stringstream s;
+        s << "Matches: " << std::fixed << std::setprecision(0) << mnMatches << ", Inliers: "
+                << std::fixed << std::setprecision(2) << 100.0*mnInliers/mnMatches << "%";
+        mImgDisplay.rowRange(2*mszImgSize.height + 5, 2*mszImgSize.height + 25) = cv::Mat::zeros(20,mImgDisplay.cols,mImgDisplay.type());
+        cv::putText(mImgDisplay, s.str(), cv::Point(5,mImgDisplay.rows-5),cv::FONT_HERSHEY_PLAIN,1,cv::Scalar(255,255,255),1,8);
     }
 
 } // namespace SFO

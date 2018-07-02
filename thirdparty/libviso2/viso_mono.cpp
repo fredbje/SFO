@@ -25,7 +25,7 @@ using namespace std;
 
   namespace libviso2{
 
-  VisualOdometryMono::VisualOdometryMono (parameters param) : param(param), VisualOdometry((VisualOdometry::parameters)param) {
+  VisualOdometryMono::VisualOdometryMono (parameters param) : VisualOdometry((VisualOdometry::parameters)param), param(param) {
   }
 
   VisualOdometryMono::~VisualOdometryMono () {

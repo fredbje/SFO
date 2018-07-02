@@ -2,18 +2,18 @@
 #include<iomanip>
 #include<thread>
 
-#include<Eigen/Core>
+//#include<Eigen/Core>
 
-#include <boost/lambda/lambda.hpp>
-#include <boost/thread.hpp>
+//#include <boost/lambda/lambda.hpp>
+//#include <boost/thread.hpp>
 #include <boost/filesystem.hpp>
 
-#include <png++/png.hpp>
+// #include <png++/png.hpp>
 
-#include <opencv2/core/core.hpp>
+//#include <opencv2/core/core.hpp>
 #include <opencv2/highgui.hpp>
 //#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
+//#include <opencv2/imgproc.hpp>
 
 #include "libviso2/matrix.h"
 #include "libviso2/viso_stereo.h"
@@ -23,7 +23,6 @@
 #include "stereo.h"
 #include "drawer.h"
 #include "frameDrawer.h"
-
 
 void loadImageFileNames(const std::string &strSequenceDir, std::vector<std::string> &vstrLeftImages,
                 std::vector<std::string> &vstrRightImages);
@@ -98,14 +97,7 @@ int main(int argc, char **argv){
         return 1;
     }
 
-    std::vector<int32_t> vInliers;
-    std::vector<libviso2::Matcher::p_match> vMatches;
-
-    //// For display the pose, begin the thread
-    // init the drawer
     auto *pDrawer = new SFO::Drawer(vGtPoses);
-    // Start the drawer thread
-    //boost::thread tDrawer(boost::bind(&SFO::Drawer::start, poseDrawer));
     std::thread tDrawer(&SFO::Drawer::start, pDrawer);
 /////////////////////////////////////////////
 
@@ -114,7 +106,6 @@ int main(int argc, char **argv){
     libviso2::Matrix gtsamPose = libviso2::Matrix::eye(4);
     libviso2::Matrix libviso2Pose = libviso2::Matrix::eye(4);
 
-    ////// the third pointer
     auto *pvGtsamPoses = new std::vector<libviso2::Matrix>();
     auto *pvLibviso2Poses = new std::vector<libviso2::Matrix>();
 
@@ -126,8 +117,10 @@ int main(int argc, char **argv){
 
     cv::Mat imgLeft(szImgSize, CV_8UC1);
     cv::Mat imgRight(szImgSize, CV_8UC1);
-    cv::namedWindow("ORB-SLAM2: Current Frame");
     SFO::FrameDrawer frameDrawer(pViso, szImgSize);
+
+    std::vector<int32_t> vInliers;
+    std::vector<libviso2::Matcher::p_match> vMatches;
     std::int32_t dims[] = {static_cast<std::int32_t>(szImgSize.width),
                            static_cast<std::int32_t>(szImgSize.height),
                            static_cast<std::int32_t>(szImgSize.width)};
@@ -164,12 +157,10 @@ int main(int argc, char **argv){
 
             cv::imshow("Stereo Gray Image", frameDrawer.drawFrame());
             cv::waitKey(static_cast<int>(T*1e3));
-
-        } else if(i == 0) {
-            std::cout << std::endl;
-        } else {
-            std::cerr << " ... failed!" << std::endl;
+        } else if(i != 0) {
+            std::cerr << " ... failed!";
         }
+        std::cout << std::endl;
     } //end for(int32_t i = 0; i < 4500; i++)
 
     pDrawer->requestFinish();
@@ -178,7 +169,7 @@ int main(int argc, char **argv){
     delete pDrawer;
     delete pvGtsamPoses;
     delete pvLibviso2Poses;
-    //delete pViso;
+    delete pViso;
 
     std::cout << "SFO_main complete! Exiting ..." << std::endl;
 
@@ -210,7 +201,7 @@ void loadImageFileNames(const std::string &strSequenceDir, std::vector<std::stri
         if(direntryFile.path().extension() == ".png") {
             vstrLeftImages.emplace_back(direntryFile.path().string());
         } else {
-            std::cerr << direntryFile << " is not an image" << std::endl;
+            std::cerr << direntryFile << " is not a png image" << std::endl;
         }
     }
 
@@ -218,7 +209,7 @@ void loadImageFileNames(const std::string &strSequenceDir, std::vector<std::stri
         if(direntryFile.path().extension() == ".png") {
             vstrRightImages.emplace_back(direntryFile.path().string());
         } else {
-            std::cerr << direntryFile << " is not an image" << std::endl;
+            std::cerr << direntryFile << " is not a png image" << std::endl;
         }
     }
 
@@ -286,20 +277,14 @@ void loadGtPoses(const std::string &strGtPosesFile, std::vector<libviso2::Matrix
         std::cerr << "Error, could not open ground truth pose file!" << std::endl;
     }
 
-    std::cout << "Loading ground truth poses.." << std::endl;
     while(std::getline(f, strLine)) {
-        // Read in next line
-
         std::istringstream iss(strLine);
-
-        double r11, r12, r13, r21, r22, r23, r31, r32, r33;
-        double t1, t2, t3;
+        double r11, r12, r13, r21, r22, r23, r31, r32, r33, t1, t2, t3;
 
         if(!(iss >> r11 >> r12 >> r13 >> t1 >> r21 >> r22 >> r23 >> t2 >> r31 >> r32 >> r33 >> t3)) {
             break;
         }
 
-        // Create clone state
         libviso2::Matrix tempPose(4,4);
         tempPose.val[0][0] = r11;
         tempPose.val[0][1] = r12;

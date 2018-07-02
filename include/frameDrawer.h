@@ -17,6 +17,10 @@ namespace SFO {
         const cv::Mat drawFrame();
 
     private:
+        void drawText();
+
+        cv::Size mszImgSize;
+
         cv::Mat mImgDisplay;
         cv::Mat mImgDisplayUpper;
         cv::Mat mImgDisplayLower;

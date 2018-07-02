@@ -28,9 +28,9 @@ using namespace std;
   namespace libviso2 {
 
   VisualOdometry::VisualOdometry(parameters param) : param(param) {
-    J         = 0;
-    p_observe = 0;
-    p_predict = 0;
+    J         = nullptr;
+    p_observe = nullptr;
+    p_predict = nullptr;
     matcher   = new Matcher(param.match);
     Tr_delta  = Matrix::eye(4);
     Tr_valid  = false;
@@ -98,7 +98,7 @@ using namespace std;
     // add num indices to current sample
     sample.clear();
     for (int32_t i=0; i<num; i++) {
-      int32_t j = rand()%totalset.size();
+      unsigned long j = rand()%totalset.size();
       sample.push_back(totalset[j]);
       totalset.erase(totalset.begin()+j);
     }

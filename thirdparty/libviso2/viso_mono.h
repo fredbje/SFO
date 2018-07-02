@@ -50,7 +50,7 @@ namespace libviso2 {
     VisualOdometryMono (parameters param);
     
     // deconstructor
-    ~VisualOdometryMono ();
+    virtual ~VisualOdometryMono ();
     
     // process a new image, pushs the image back to an internal ring buffer.
     // valid motion estimates are available after calling process for two times.
