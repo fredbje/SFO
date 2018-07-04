@@ -9,14 +9,15 @@
 #include "libviso2/matrix.h"
 #include "libviso2/viso_stereo.h"
 
-#include "stereo.h"
+#include "gtsamTracker.h"
 #include "mapDrawer.h"
 #include "frameDrawer.h"
+#include "system.h"
 
 void loadImageFileNames(const std::string &strSequenceDir, std::vector<std::string> &vstrLeftImages,
                 std::vector<std::string> &vstrRightImages);
 void readImages(cv::Mat &imgLeft, cv::Mat &imgRight, const std::string &strLeftImage,
-                const std::string &strRightImage, const cv::Size &szRefSize);
+                const std::string &strRightImage);
 void loadTimeStamps(const std::string &strTimestampsFile, std::vector<double> &vTimestamps);
 void loadGtPoses(const std::string &strGtPosesFile, std::vector<libviso2::Matrix> &vGtPoses);
 
@@ -52,114 +53,18 @@ int main(int argc, char **argv){
         return 1;
     }
 
-    cv::FileStorage fSettings(strSettingsFile, cv::FileStorage::READ);
-
-    if(!fSettings.isOpened()) {
-        std::cerr << "Failed to open settings file at: " << strSettingsFile << std::endl;
-    }
-
-    float fx = fSettings["Camera.fx"]; // focal length in pixels
-    float fy = fSettings["Camera.fy"]; // focal length in pixels
-    float cx = fSettings["Camera.cx"]; // principal point (x/u-coordinate) in pixels
-    float cy = fSettings["Camera.cy"]; // principal point (y/v-coordinate) in pixels
-    float bf = fSettings["Camera.bf"];
-    float base = bf/fx;                // baseline in meters
-    float s = 0;                       // shear
-
-    cv::Size szImgSize(fSettings["Camera.width"], fSettings["Camera.height"]);
-
-    float fps = fSettings["Camera.fps"];
-    double T = (fps < 1) ? 1/30 : 1/fps;
-
-    fSettings.release();
-
-    libviso2::VisualOdometryStereo::parameters param;
-    param.calib.f  = fx;
-    param.calib.cu = cx;
-    param.calib.cv = cy;
-    param.base     = base;
-
-    auto *pTracker = new libviso2::VisualOdometryStereo(param);
-
-    // construct the stereo calibration shared pointer, no need to delete it
-    const gtsam::Cal3_S2Stereo::shared_ptr K(new gtsam::Cal3_S2Stereo(fx, fy, s, cx, cy, base));
-    double sigmaPixel = 2;
-    const gtsam::noiseModel::Isotropic::shared_ptr model = gtsam::noiseModel::Isotropic::Sigma(3, sigmaPixel);
-
-    auto *pDrawer = new SFO::MapDrawer(strSettingsFile, vGtPoses);
-    std::thread tDrawer(&SFO::MapDrawer::start, pDrawer);
-
 /////////////////////////////////////////////
 
-    // current pose (this matrix transforms a point from the current
-    // frame's camera coordinates to the first frame's camera coordinates)
-    libviso2::Matrix gtsamPose = libviso2::Matrix::eye(4);
-    libviso2::Matrix libviso2Pose = libviso2::Matrix::eye(4);
 
-    auto *pvGtsamPoses = new std::vector<libviso2::Matrix>();
-    auto *pvLibviso2Poses = new std::vector<libviso2::Matrix>();
-
-    pvGtsamPoses->push_back(gtsamPose);
-    pvLibviso2Poses->push_back(libviso2Pose);
-
-    pDrawer->updateGtsamPoses(pvGtsamPoses);
-    pDrawer->updateLibviso2Poses(pvLibviso2Poses);
-
-    cv::Mat imgLeft(szImgSize, CV_8UC1);
-    cv::Mat imgRight(szImgSize, CV_8UC1);
-    SFO::FrameDrawer frameDrawer(pTracker, szImgSize);
-
-    std::vector<int32_t> vInliers;
-    std::vector<libviso2::Matcher::p_match> vMatches;
-    std::int32_t dims[] = {static_cast<std::int32_t>(szImgSize.width),
-                           static_cast<std::int32_t>(szImgSize.height),
-                           static_cast<std::int32_t>(szImgSize.width)};
+    SFO::System SLAM(strSettingsFile, vGtPoses);
+    cv::Mat imgLeft;
+    cv::Mat imgRight;
     for (std::size_t i = 0; i < 50/*vstrLeftImages.size()*/; i++) { // 4541 images
-
-        readImages(imgLeft, imgRight, vstrLeftImages[i], vstrRightImages[i], szImgSize);
-
-        std::cout << "Processing: Frame: " << std::setw(4) << i;
-
-        if (pTracker->process(imgLeft.data, imgRight.data, dims)) {
-            vMatches.clear();
-            vInliers.clear();
-            vMatches = pTracker->getMatches();
-            vInliers = pTracker->getInlierIndices();
-
-            //libviso2::Matrix poseInit = libviso2::Matrix::inv(viso->getMotion());
-
-            libviso2::Matrix poseInit = libviso2::Matrix::eye(4); // Initial guess?
-            libviso2::Matrix poseOpt(4, 4);
-
-            //TODO: Local Optimization to get an optimized relative pose and feature point
-            SFO::localOptimization(vMatches, vInliers, poseInit, sigmaPixel, K, model, poseOpt);
-
-            gtsamPose = gtsamPose * (poseOpt);
-            pvGtsamPoses->push_back(gtsamPose);
-
-            libviso2Pose = libviso2Pose * libviso2::Matrix::inv(pTracker->getMotion());
-            pvLibviso2Poses->push_back(libviso2Pose);
-
-            pDrawer->updateGtsamPoses(pvGtsamPoses);
-            pDrawer->updateLibviso2Poses(pvLibviso2Poses);
-
-            frameDrawer.update(imgLeft, imgRight);
-
-            cv::imshow("Stereo Gray Image", frameDrawer.drawFrame());
-            cv::waitKey(static_cast<int>(T*1e3));
-        } else if(i != 0) {
-            std::cerr << " ... failed!";
-        }
-        std::cout << std::endl;
+        readImages(imgLeft, imgRight, vstrLeftImages[i], vstrRightImages[i]);
+        SLAM.trackStereo(imgLeft, imgRight, vTimestamps[i]);
     } //end for(int32_t i = 0; i < 4500; i++)
 
-    pDrawer->requestFinish();
-    tDrawer.join();
-
-    delete pDrawer;
-    delete pvGtsamPoses;
-    delete pvLibviso2Poses;
-    delete pTracker;
+    SLAM.shutdown();
 
     std::cout << "SFO_main complete! Exiting ..." << std::endl;
 
@@ -213,7 +118,7 @@ void loadImageFileNames(const std::string &strSequenceDir, std::vector<std::stri
 }
 
 void readImages(cv::Mat &imgLeft, cv::Mat &imgRight, const std::string &strLeftImage,
-                const std::string &strRightImage, const cv::Size &szRefSize) {
+                const std::string &strRightImage) {
     imgLeft = cv::imread(strLeftImage, cv::IMREAD_GRAYSCALE);
     imgRight = cv::imread(strRightImage, cv::IMREAD_GRAYSCALE);
 
@@ -222,11 +127,6 @@ void readImages(cv::Mat &imgLeft, cv::Mat &imgRight, const std::string &strLeftI
     } else if(imgRight.empty()) {
         std::cerr << "Couldn't read image from" << strRightImage << std::endl;
     }
-
-    if(imgLeft.size() != szRefSize || imgRight.size() != szRefSize) {
-        std::cout << "Error, images have different size than specified in settings file." << std::endl;
-    }
-
 }
 
 void loadTimeStamps(const std::string &strTimestampsFile, std::vector<double> &vTimestamps) {

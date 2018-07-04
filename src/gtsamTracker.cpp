@@ -1,7 +1,11 @@
 #include <gtsam/nonlinear/Marginals.h>
-#include "stereo.h"
+#include "gtsamTracker.h"
 
 namespace SFO {
+    GtsamTracker::GtsamTracker() {
+
+    }
+
     void cvtMatrix2Eigen(const libviso2::Matrix &Min, Eigen::MatrixXd &Mout) {
         long m = Min.m;
         long n = Min.n;

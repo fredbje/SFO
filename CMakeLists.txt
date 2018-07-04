@@ -70,9 +70,10 @@ file(GLOB_RECURSE sources_thirdparty thirdparty/*.cpp)
 # Main class files
 #####################################
 set(sources_SFO
-    src/stereo.cpp
+        src/gtsamTracker.cpp
     src/mapDrawer.cpp
     src/frameDrawer.cpp
+    src/system.cpp
 )
 
 
