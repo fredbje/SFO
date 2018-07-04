@@ -10,7 +10,7 @@
 namespace SFO {
     class FrameDrawer {
     public:
-        FrameDrawer(libviso2::VisualOdometryStereo * const pViso, const cv::Size &szImgSize);
+        FrameDrawer(libviso2::VisualOdometryStereo *pTracker, const cv::Size &szImgSize);
 
         void update(const cv::Mat &imgLeft, const cv::Mat &imgRight);
 
@@ -27,7 +27,7 @@ namespace SFO {
 
         std::mutex mMutexUpdate;
 
-        libviso2::VisualOdometryStereo * const mpViso;
+        libviso2::VisualOdometryStereo *mpTracker;
 
         std::vector<libviso2::Matcher::p_match> mvMatches;
         std::vector<int32_t> mvInliers;

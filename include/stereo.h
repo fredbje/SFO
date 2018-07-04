@@ -34,7 +34,6 @@ namespace SFO {
     void localOptimization(const std::vector<libviso2::Matcher::p_match>& pM,
                            const std::vector<int32_t> &inliers,
                            const libviso2::Matrix& pose,
-                           const libviso2::VisualOdometryStereo::parameters param,
                            const double sigmaPixel,
                            const gtsam::Cal3_S2Stereo::shared_ptr K,
                            const gtsam::noiseModel::Isotropic::shared_ptr model,

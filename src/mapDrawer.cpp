@@ -67,16 +67,12 @@ namespace SFO {
         glVertex3f(-w,-h,z);
         glVertex3f(0,0,0);
         glVertex3f(-w,h,z);
-
         glVertex3f(w,h,z);
         glVertex3f(w,-h,z);
-
         glVertex3f(-w,h,z);
         glVertex3f(-w,-h,z);
-
         glVertex3f(-w,h,z);
         glVertex3f(w,h,z);
-
         glVertex3f(-w,-h,z);
         glVertex3f(w,-h,z);
         glEnd();

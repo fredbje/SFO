@@ -1,7 +1,3 @@
-//
-// Created by lindeyang on 11/30/16.
-//
-
 #include <gtsam/nonlinear/Marginals.h>
 #include "stereo.h"
 
@@ -30,33 +26,29 @@ namespace SFO {
         R = gtsam::Rot3(Min.val[0][0], Min.val[0][1],Min.val[0][2],
                         Min.val[1][0], Min.val[1][1],Min.val[1][2],
                         Min.val[2][0], Min.val[2][1],Min.val[2][2]);
-        //T = gtsam::Point3(gtsam::Vector3(Min.val[0][3], Min.val[1][3], Min.val[2][3]));
         T = gtsam::Point3(Min.val[0][3], Min.val[1][3], Min.val[2][3]);
 
     }
 
 
-    void matchedpairs(const libviso2::Matcher::p_match &pM,
+    void matchedpairs(const libviso2::Matcher::p_match &vMatches,
                       gtsam::StereoPoint2 &p1,
                       gtsam::StereoPoint2 &p2){
-        p1 = gtsam::StereoPoint2(pM.u1p,pM.u2p,pM.v1p);
-        p2 = gtsam::StereoPoint2(pM.u1c,pM.u2c,pM.v1c);
+        p1 = gtsam::StereoPoint2(vMatches.u1p,vMatches.u2p,vMatches.v1p);
+        p2 = gtsam::StereoPoint2(vMatches.u1c,vMatches.u2c,vMatches.v1c);
     }
 
 
-    void localOptimization(const std::vector<libviso2::Matcher::p_match> &pM,
-                                const std::vector<int32_t> &inliers,
-                                const libviso2::Matrix &pose,
-                                const libviso2::VisualOdometryStereo::parameters param,
-                                const double sigmaPixel,
-                                const gtsam::Cal3_S2Stereo::shared_ptr K,
-                                const gtsam::noiseModel::Isotropic::shared_ptr model,
-                                libviso2::Matrix &poseOpt){//},
-                                //Eigen::Matrix<double, 6, 6> &cov) {
+    void localOptimization(const std::vector<libviso2::Matcher::p_match> &vMatches,
+                           const std::vector<int32_t> &vInliers,
+                           const libviso2::Matrix &pose, // eye(4)
+                           const double sigmaPixel,
+                           const gtsam::Cal3_S2Stereo::shared_ptr K,
+                           const gtsam::noiseModel::Isotropic::shared_ptr model,
+                           libviso2::Matrix &poseOpt) {
 
         gtsam::NonlinearFactorGraph graph;
         gtsam::Values initialEstimate;
-        //const gtsam::noiseModel::Isotropic::shared_ptr model = gtsam::noiseModel::Isotropic::Sigma(3,sigmaPixel);
 
         //setup the first pose
         //assume the first pose is the origin
@@ -76,51 +68,31 @@ namespace SFO {
 
         size_t counter = 0;
         //construct the points
-        for(size_t kk=0; kk<inliers.size()-1; kk++){
-            gtsam::StereoPoint2 spt1 = gtsam::StereoPoint2(pM[inliers[kk]].u1p,pM[inliers[kk]].u2p,pM[inliers[kk]].v1p);
-            gtsam::StereoPoint2 spt2 = gtsam::StereoPoint2(pM[inliers[kk]].u1c,pM[inliers[kk]].u2c,pM[inliers[kk]].v1c);
+        for(size_t kk=0; kk<vInliers.size()-1; kk++){
+            gtsam::StereoPoint2 spt1 = gtsam::StereoPoint2(vMatches[vInliers[kk]].u1p,vMatches[vInliers[kk]].u2p,vMatches[vInliers[kk]].v1p);
+            gtsam::StereoPoint2 spt2 = gtsam::StereoPoint2(vMatches[vInliers[kk]].u1c,vMatches[vInliers[kk]].u2c,vMatches[vInliers[kk]].v1c);
 
             gtsam::Point3 pt = stereoCam.backproject(spt1);
-            if(pt.z() <= 40*(K->baseline())){
+            if(pt.z() <= 40*(K->baseline())) {
 
                 counter++;
-                initialEstimate.insert(gtsam::Symbol('f',counter),pt);
-                graph.push_back(gtsam::GenericStereoFactor<gtsam::Pose3, gtsam::Point3>(spt1,model,gtsam::Symbol('x',1), gtsam::Symbol('f',counter),K));
-                graph.push_back(gtsam::GenericStereoFactor<gtsam::Pose3, gtsam::Point3>(spt2,model,gtsam::Symbol('x',2), gtsam::Symbol('f',counter),K));
-
-            }else{
-    //            std::cout<<pt.z()<<endl;
+                initialEstimate.insert(gtsam::Symbol('f', counter), pt);
+                graph.push_back(
+                        gtsam::GenericStereoFactor<gtsam::Pose3, gtsam::Point3>(spt1, model, gtsam::Symbol('x', 1),
+                                                                                gtsam::Symbol('f', counter), K));
+                graph.push_back(
+                        gtsam::GenericStereoFactor<gtsam::Pose3, gtsam::Point3>(spt2, model, gtsam::Symbol('x', 2),
+                                                                                gtsam::Symbol('f', counter), K));
             }
-
-
         }
-        //std::cout<< "OK flag3" <<endl;
-        //std::cout<< "size of inliers "<<inliers.size()<<endl;
 
         //finish the graph and begin to optimization
         gtsam::LevenbergMarquardtParams lmParams;
         lmParams.maxIterations = 10;
-        //gtsam::LevenbergMarquardtOptimizer lmOptimizer = gtsam::LevenbergMarquardtOptimizer(graph,initialEstimate,lmParams);
         gtsam::LevenbergMarquardtOptimizer optimizer(graph, initialEstimate, lmParams);
-        //gtsam::Values result = optimizer.optimize();
         gtsam::Values result = optimizer.optimize();
-
-        //gtsam::Values result = lmOptimizer.optimize();
         gtsam::Pose3 tempPose = result.at<gtsam::Pose3>(gtsam::Symbol('x',2));
-
-        //get the new relative pose pointer
-        //poseOpt = new libviso2::Matrix(4,4);
         cvtgtPose2RT(tempPose,poseOpt);
-        //std::cout<<endl<<"OK flag5"<<endl;
-        //get the covariances
-        //gtsam::Marginals marginals(graph,result);
-        //std::cout<<endl<<"OK flag51"<<endl;
-        //cov = marginals.marginalCovariance(gtsam::Symbol('x',2));
-        //cout<<"covarianes"<<endl<<cov<<endl;
-
-        //std::cout<< "Final result sample: "<<endl;
-        //gtsam::Values pose_values = result.filter<gtsam::Pose3> ();
-        //pose_values.print("Final camera poses:\n");
 
     }
 

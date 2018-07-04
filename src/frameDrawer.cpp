@@ -3,11 +3,11 @@
 #include <iomanip>
 
 namespace SFO {
-    FrameDrawer::FrameDrawer(libviso2::VisualOdometryStereo * const pViso, const cv::Size &szImgSize)
-            : mpViso(pViso) {
+    FrameDrawer::FrameDrawer(libviso2::VisualOdometryStereo *pTracker, const cv::Size &szImgSize)
+            : mpTracker(pTracker) {
         mszImgSize = szImgSize;
         int textHeight = 20; // Actually 10, but leaving som space over and under
-        int borderHeight = 5;
+        int borderHeight = 5; // Border between images
         mImgDisplay = cv::Mat(2*szImgSize.height + borderHeight + textHeight, szImgSize.width, CV_8UC3);
         mImgDisplayUpper = cv::Mat(mImgDisplay, cv::Rect(0, 0, szImgSize.width, szImgSize.height));
         mImgDisplayLower = cv::Mat(mImgDisplay, cv::Rect(0, szImgSize.height + borderHeight, szImgSize.width, szImgSize.height));
@@ -17,10 +17,10 @@ namespace SFO {
         std::unique_lock<std::mutex> lock(mMutexUpdate);
         cv::cvtColor(imgLeft, mImgDisplayUpper, CV_GRAY2RGB);
         cv::cvtColor(imgRight, mImgDisplayLower, CV_GRAY2RGB);
-        mvMatches = mpViso->getMatches();
-        mvInliers = mpViso->getInlierIndices();
-        mnMatches = mpViso->getNumberOfMatches();
-        mnInliers = mpViso->getNumberOfInliers();
+        mvMatches = mpTracker->getMatches();
+        mvInliers = mpTracker->getInlierIndices();
+        mnMatches = mpTracker->getNumberOfMatches();
+        mnInliers = mpTracker->getNumberOfInliers();
     }
 
     const cv::Mat FrameDrawer::drawFrame() {

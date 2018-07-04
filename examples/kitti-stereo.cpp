@@ -2,23 +2,12 @@
 #include<iomanip>
 #include<thread>
 
-//#include<Eigen/Core>
-
-//#include <boost/lambda/lambda.hpp>
-//#include <boost/thread.hpp>
 #include <boost/filesystem.hpp>
 
-// #include <png++/png.hpp>
-
-//#include <opencv2/core/core.hpp>
 #include <opencv2/highgui.hpp>
-//#include <opencv2/imgcodecs.hpp>
-//#include <opencv2/imgproc.hpp>
 
 #include "libviso2/matrix.h"
 #include "libviso2/viso_stereo.h"
-
-//#include "GeographicLib/Config.h"
 
 #include "stereo.h"
 #include "mapDrawer.h"
@@ -90,7 +79,7 @@ int main(int argc, char **argv){
     param.calib.cv = cy;
     param.base     = base;
 
-    auto *pViso = new libviso2::VisualOdometryStereo(param);
+    auto *pTracker = new libviso2::VisualOdometryStereo(param);
 
     // construct the stereo calibration shared pointer, no need to delete it
     const gtsam::Cal3_S2Stereo::shared_ptr K(new gtsam::Cal3_S2Stereo(fx, fy, s, cx, cy, base));
@@ -118,7 +107,7 @@ int main(int argc, char **argv){
 
     cv::Mat imgLeft(szImgSize, CV_8UC1);
     cv::Mat imgRight(szImgSize, CV_8UC1);
-    SFO::FrameDrawer frameDrawer(pViso, szImgSize);
+    SFO::FrameDrawer frameDrawer(pTracker, szImgSize);
 
     std::vector<int32_t> vInliers;
     std::vector<libviso2::Matcher::p_match> vMatches;
@@ -131,11 +120,11 @@ int main(int argc, char **argv){
 
         std::cout << "Processing: Frame: " << std::setw(4) << i;
 
-        if (pViso->process(imgLeft.data, imgRight.data, dims)) {
+        if (pTracker->process(imgLeft.data, imgRight.data, dims)) {
             vMatches.clear();
             vInliers.clear();
-            vMatches = pViso->getMatches();
-            vInliers = pViso->getInlierIndices();
+            vMatches = pTracker->getMatches();
+            vInliers = pTracker->getInlierIndices();
 
             //libviso2::Matrix poseInit = libviso2::Matrix::inv(viso->getMotion());
 
@@ -143,12 +132,12 @@ int main(int argc, char **argv){
             libviso2::Matrix poseOpt(4, 4);
 
             //TODO: Local Optimization to get an optimized relative pose and feature point
-            SFO::localOptimization(vMatches, vInliers, poseInit, param, sigmaPixel, K, model, poseOpt);
+            SFO::localOptimization(vMatches, vInliers, poseInit, sigmaPixel, K, model, poseOpt);
 
             gtsamPose = gtsamPose * (poseOpt);
             pvGtsamPoses->push_back(gtsamPose);
 
-            libviso2Pose = libviso2Pose * libviso2::Matrix::inv(pViso->getMotion());
+            libviso2Pose = libviso2Pose * libviso2::Matrix::inv(pTracker->getMotion());
             pvLibviso2Poses->push_back(libviso2Pose);
 
             pDrawer->updateGtsamPoses(pvGtsamPoses);
@@ -170,7 +159,7 @@ int main(int argc, char **argv){
     delete pDrawer;
     delete pvGtsamPoses;
     delete pvLibviso2Poses;
-    delete pViso;
+    delete pTracker;
 
     std::cout << "SFO_main complete! Exiting ..." << std::endl;
 
