@@ -36,6 +36,9 @@ namespace SFO {
             cv::circle(mImgDisplayUpper, pt_left, 2, color);
             cv::Point2f pt_right(match.u2c, match.v2c);
             cv::circle(mImgDisplayLower, pt_right, 2, color);
+
+            //cv::putText (mImgDisplayUpper, std::to_string(j), pt_left, cv::FONT_HERSHEY_PLAIN, 0.5, CV_RGB(255,255,255));
+            //cv::putText (mImgDisplayLower, std::to_string(j), pt_right, cv::FONT_HERSHEY_PLAIN, 0.5, CV_RGB(255,255,255));
         }
         drawText();
         return mImgDisplay;
