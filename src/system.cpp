@@ -73,19 +73,6 @@ namespace SFO {
             mvMatches = mpTracker->getMatches();
             mvInliers = mpTracker->getInlierIndices();
 
-            //libviso2::Matrix poseInit = libviso2::Matrix::inv(mpTracker->getMotion());
-            libviso2::Matrix poseInit = libviso2::Matrix::eye(4); // Initial guess?
-            libviso2::Matrix poseOpt(4, 4);
-
-            // construct the stereo calibration shared pointer, no need to delete it
-            gtsam::Cal3_S2Stereo::shared_ptr K(new gtsam::Cal3_S2Stereo(mParam.calib.f, mParam.calib.f, 0, mParam.calib.cu, mParam.calib.cv, mParam.base));
-            double sigmaPixel = 2;
-            const gtsam::noiseModel::Isotropic::shared_ptr mNoiseModel = gtsam::noiseModel::Isotropic::Sigma(3, sigmaPixel);
-            SFO::localOptimization(mvMatches, mvInliers, poseInit, sigmaPixel, K, mNoiseModel, poseOpt);
-
-            mGtsamPose = mGtsamPose * (poseOpt);
-            mpvGtsamPoses->push_back(mGtsamPose);
-
             // returns transformation from previous to current coordinates as a 4x4
             // homogeneous transformation matrix Tr_delta, with the following semantics:
             // p_t = Tr_delta * p_ {t-1} takes a point in the camera coordinate system
@@ -96,8 +83,15 @@ namespace SFO {
             mLibviso2Pose = mLibviso2Pose * libviso2::Matrix::inv(mpTracker->getMotion());
             mpvLibviso2Poses->push_back(mLibviso2Pose);
 
-            mpMapDrawer->updateGtsamPoses(mpvGtsamPoses);
+            mGtsamPose = mGtsamPose * libviso2::Matrix::inv(mpTracker->getMotion());
+            GtsamTracker::update(mGtsamPose);
+            GtsamTracker::localOptimization(mvMatches, mvInliers, mpvGtsamPoses);
+
+
+            mpvGtsamPoses->push_back(mGtsamPose);
+
             mpMapDrawer->updateLibviso2Poses(mpvLibviso2Poses);
+            mpMapDrawer->updateGtsamPoses(mpvGtsamPoses);
 
             mpFrameDrawer->update(imgLeft, imgRight);
 

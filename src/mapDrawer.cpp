@@ -31,11 +31,12 @@ namespace SFO {
     }
 
     void MapDrawer::updateGtsamPoses(std::vector<libviso2::Matrix> *pvGtsamPoses) {
-        // TODO: Lock the variable
+        std::unique_lock<std::mutex> lock(mMutexGtsamPoses);
         mpvGtsamPoses->insert(mpvGtsamPoses->end(), pvGtsamPoses->begin() + mpvGtsamPoses->size(), pvGtsamPoses->end());
     }
 
     void MapDrawer::updateLibviso2Poses(std::vector<libviso2::Matrix> *pvLibviso2Poses) {
+        std::unique_lock<std::mutex> lock(mMutexLibviso2Poses);
         mpvLibviso2Poses->insert(mpvLibviso2Poses->end(), pvLibviso2Poses->begin() + mpvLibviso2Poses->size(), pvLibviso2Poses->end());
     }
     
@@ -179,17 +180,26 @@ namespace SFO {
             pangolin::OpenGlMatrix Tw2Gt;
 
             // Draw current frame
-            for(std::size_t i = 1; i < mpvGtsamPoses->size(); i++) {
+            size_t i = 1;
+            while(true) {
+                std::unique_lock<std::mutex> lockGtsam(mMutexGtsamPoses);
+                if(i >= mpvGtsamPoses->size()) {
+                    break;
+                }
                 Tw1Gtsam    = getOpenGlMatrix(mpvGtsamPoses->at(i-1));
                 Tw2Gtsam    = getOpenGlMatrix(mpvGtsamPoses->at(i));
+                lockGtsam.unlock();
+
                 if(i == 1) {
                     drawCamera(Tw1Gtsam, green);
                 }
                 drawCamera(Tw2Gtsam, green);
                 drawLines(Tw1Gtsam, Tw2Gtsam, green);
 
+                std::unique_lock<std::mutex> lockLibviso2(mMutexLibviso2Poses);
                 Tw1Libviso2 = getOpenGlMatrix(mpvLibviso2Poses->at(i-1));
                 Tw2Libviso2 = getOpenGlMatrix(mpvLibviso2Poses->at(i));
+                lockLibviso2.unlock();
                 if(i == 1) {
                     drawCamera(Tw1Libviso2, blue);
                 }
@@ -205,6 +215,7 @@ namespace SFO {
                     drawCamera(Tw2Gt, red);
                     drawLines(Tw1Gt, Tw2Gt, red);
                 }
+                i++;
             }
 
             // Swap frames and Process Events

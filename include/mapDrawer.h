@@ -46,6 +46,9 @@ namespace SFO {
         // Return global translation matrix
         pangolin::OpenGlMatrix getOpenGlMatrix(libviso2::Matrix pose);
 
+        std::mutex mMutexGtsamPoses;
+        std::mutex mMutexLibviso2Poses;
+
         std::mutex mMutexFinish;
         bool checkFinish();
         bool mbFinishRequested = false;

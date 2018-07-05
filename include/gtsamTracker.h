@@ -30,27 +30,32 @@ namespace SFO {
     class GtsamTracker {
     public:
 
-        GtsamTracker();
+        GtsamTracker(const std::string &strSettingsFile);
 
-        void cvtMatrix2Eigen(const libviso2::Matrix &Min, Eigen::MatrixXd &Mout);
+        ~GtsamTracker();
+
+        void cvtMatrix2Gtsam(const libviso2::Matrix &Min, gtsam::Matrix &Mout);
         void cvtMatrix2RT(const libviso2::Matrix &Min, gtsam::Rot3 &R, gtsam::Point3 &T);
         void cvtgtPose2RT(const gtsam::Pose3 &pose, libviso2::Matrix &ptrM);
 
-        void localOptimization(const std::vector<libviso2::Matcher::p_match>& pM,
-                               const std::vector<int32_t> &inliers,
-                               const libviso2::Matrix& pose,
-                               const double sigmaPixel,
-                               const gtsam::Cal3_S2Stereo::shared_ptr K,
-                               const gtsam::noiseModel::Isotropic::shared_ptr model,
-                               libviso2::Matrix &poseOpt);//,
-                               //Eigen::Matrix<double, 6,6> &cov);
+        void update(libviso2::Matrix, const std::vector<libviso2::Matcher::p_match> &vMatches,
+                    const std::vector<int32_t> &vInliers);
+        void optimize(std::vector<libviso2::Matrix> *gtsamPoses);
 
         // From the matched feature pair to previous and current sterepoints
-        void matchedpairs(const libviso2::Matcher::p_match &pM,
+        void getMatchedPairs(const libviso2::Matcher::p_match &match,
                           gtsam::StereoPoint2 &p1,
                           gtsam::StereoPoint2 &p2);
     private:
+        size_t mPoseId, mLandmarkId;
+        void loadCameraMatrix(const std::string &strSettingsFile);
+        gtsam::Cal3_S2Stereo::shared_ptr mK;
+        //gtsam::noiseModel::Isotropic::shared_ptr mNoiseModel;
+        gtsam::noiseModel::Isotropic::shared_ptr mMeasurementNoise;
+        gtsam::StereoCamera mStereoCamera;
 
+        gtsam::NonlinearFactorGraph mGraph;
+        gtsam::Values mInitialEstimate;
     };
 }
 #endif //SFO_STEREO_H
