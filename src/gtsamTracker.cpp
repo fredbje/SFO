@@ -1,5 +1,18 @@
 #include <gtsam/nonlinear/Marginals.h>
 #include <opencv2/core/persistence.hpp>
+
+
+#include <gtsam/inference/Symbol.h>
+#include <gtsam/nonlinear/NonlinearEquality.h>
+#include <gtsam/nonlinear/ISAM2.h>
+#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
+
+
+
+#include <gtsam/slam/StereoFactor.h>
+#include <gtsam/slam/ProjectionFactor.h>
+
+
 #include "gtsamTracker.h"
 
 namespace SFO {
@@ -12,6 +25,7 @@ namespace SFO {
         mPoseId = 0;
         mLandmarkId = 1;
         mEstimate.insert(gtsam::Symbol('x', mPoseId++), mStereoCamera.pose());
+        //mGraph.emplace_shared<gtsam::NonlinearEquality<gtsam::Pose3> >(gtsam::Symbol('x',1), mStereoCamera.pose());
     }
 
     GtsamTracker::~GtsamTracker() = default;
@@ -80,17 +94,25 @@ namespace SFO {
     }
 
     std::vector<libviso2::Matrix> GtsamTracker::optimize() {
-        ISAM2Params parameters;
+        gtsam::ISAM2Params parameters;
         parameters.relinearizeThreshold = 0.01;
         parameters.relinearizeSkip = 1;
-        ISAM2 isam(parameters);
+        gtsam::ISAM2 isam(parameters);
 
+        isam.update(mGraph, mEstimate);
+        // Each call to iSAM2 update(*) performs one iteration of the iterative nonlinear solver.
+        // If accuracy is desired at the expense of time, update(*) can be called additional times
+        // to perform multiple optimizer iterations every step.
+        //isam.update();
+        gtsam::Values mEstimate = isam.calculateEstimate();
 
+        /*
         gtsam::LevenbergMarquardtParams params;
         params.orderingType = gtsam::Ordering::METIS;
         params.maxIterations = 10;
         gtsam::LevenbergMarquardtOptimizer optimizer(mGraph, mEstimate, params);
         mEstimate = optimizer.optimize();
+        */
         std::vector<libviso2::Matrix> poses;
         for(size_t i = 0; i < mPoseId; i++) {
             gtsam::Pose3 tempPose = mEstimate.at<gtsam::Pose3>(gtsam::Symbol('x',i));

@@ -4,6 +4,15 @@
 
 #ifndef SFO_STEREO_H
 #define SFO_STEREO_H
+#include <gtsam/geometry/Pose3.h>
+#include <gtsam/geometry/Point3.h>
+#include <gtsam/geometry/StereoPoint2.h>
+#include <gtsam/geometry/Cal3_S2Stereo.h>
+#include <gtsam/geometry/StereoCamera.h>
+#include <gtsam/nonlinear/Values.h>
+#include <gtsam/nonlinear/NonlinearFactorGraph.h>
+#include <gtsam/nonlinear/Marginals.h> // For noisemodel
+
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -11,21 +20,6 @@
 #include <libviso2/matcher.h>
 #include <libviso2/viso_stereo.h>
 #include "libviso2/matrix.h"
-
-#include <gtsam/geometry/Pose3.h>
-#include <gtsam/geometry/Point3.h>
-#include <gtsam/inference/Symbol.h>
-#include <gtsam/nonlinear/Values.h>
-#include <gtsam/nonlinear/NonlinearEquality.h>
-#include <gtsam/nonlinear/NonlinearFactorGraph.h>
-#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
-#include <gtsam/nonlinear/Marginals.h>
-
-#include <gtsam/geometry/Cal3_S2Stereo.h>
-#include <gtsam/geometry/StereoCamera.h>
-#include <gtsam/geometry/StereoPoint2.h>
-#include <gtsam/slam/StereoFactor.h>
-#include <gtsam/slam/ProjectionFactor.h>
 
 namespace SFO {
     class GtsamTracker {
