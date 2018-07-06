@@ -26,8 +26,7 @@ namespace SFO {
 
         ~MapDrawer();
 
-        void updateGtsamPoses(std::vector<libviso2::Matrix> *pvGtsamPoses);
-        void updateLibviso2Poses(std::vector<libviso2::Matrix> *pvLibviso2Poses);
+        void updatePoses(std::vector<libviso2::Matrix> *pvPoses);
 
         void start();
 
@@ -35,8 +34,7 @@ namespace SFO {
 
     private:
         libviso2::Matrix mPose;
-        std::vector<libviso2::Matrix> *mpvGtsamPoses;
-        std::vector<libviso2::Matrix> *mpvLibviso2Poses;
+        std::vector<libviso2::Matrix> *mpvPoses;
         std::vector<libviso2::Matrix> *mpvGtPoses;
 
         enum Color { red, green, blue };
@@ -46,8 +44,7 @@ namespace SFO {
         // Return global translation matrix
         pangolin::OpenGlMatrix getOpenGlMatrix(libviso2::Matrix pose);
 
-        std::mutex mMutexGtsamPoses;
-        std::mutex mMutexLibviso2Poses;
+        std::mutex mMutexPoses;
 
         std::mutex mMutexFinish;
         bool checkFinish();

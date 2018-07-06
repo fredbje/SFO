@@ -13,8 +13,7 @@ namespace SFO {
         mViewpointZ = fSettings["Viewer.ViewpointZ"];
         mViewpointF = fSettings["Viewer.ViewpointF"];
 
-        mpvGtsamPoses = new std::vector<libviso2::Matrix>();
-        mpvLibviso2Poses = new std::vector<libviso2::Matrix>();
+        mpvPoses = new std::vector<libviso2::Matrix>();
         mpvGtPoses = new std::vector<libviso2::Matrix>();
     }
 
@@ -25,20 +24,15 @@ namespace SFO {
     }
 
     MapDrawer::~MapDrawer() {
-        delete mpvGtsamPoses;
-        delete mpvLibviso2Poses;
+        delete mpvPoses;
         delete mpvGtPoses;
     }
 
-    void MapDrawer::updateGtsamPoses(std::vector<libviso2::Matrix> *pvGtsamPoses) {
-        std::unique_lock<std::mutex> lock(mMutexGtsamPoses);
-        mpvGtsamPoses->insert(mpvGtsamPoses->end(), pvGtsamPoses->begin() + mpvGtsamPoses->size(), pvGtsamPoses->end());
+    void MapDrawer::updatePoses(std::vector<libviso2::Matrix> *pvPoses) {
+        std::unique_lock<std::mutex> lock(mMutexPoses);
+        mpvPoses->insert(mpvPoses->end(), pvPoses->begin() + mpvPoses->size(), pvPoses->end());
     }
 
-    void MapDrawer::updateLibviso2Poses(std::vector<libviso2::Matrix> *pvLibviso2Poses) {
-        std::unique_lock<std::mutex> lock(mMutexLibviso2Poses);
-        mpvLibviso2Poses->insert(mpvLibviso2Poses->end(), pvLibviso2Poses->begin() + mpvLibviso2Poses->size(), pvLibviso2Poses->end());
-    }
     
     void MapDrawer::drawCamera(pangolin::OpenGlMatrix &Twc, Color color) {
         float CameraSize = 0.5;
@@ -148,11 +142,11 @@ namespace SFO {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // Skip if there are no poses
-            if(mpvGtsamPoses->empty()) {
+            if(mpvPoses->empty()) {
                 continue;
             }
 
-            Twc = getOpenGlMatrix(mpvGtsamPoses->back());
+            Twc = getOpenGlMatrix(mpvPoses->back());
             if(menuFollowCamera && bFollow)
             {
                 s_cam.Follow(Twc);
@@ -174,20 +168,18 @@ namespace SFO {
             // The two poses we are drawing lines between
             pangolin::OpenGlMatrix Tw1Gtsam;
             pangolin::OpenGlMatrix Tw2Gtsam;
-            pangolin::OpenGlMatrix Tw1Libviso2;
-            pangolin::OpenGlMatrix Tw2Libviso2;
             pangolin::OpenGlMatrix Tw1Gt;
             pangolin::OpenGlMatrix Tw2Gt;
 
             // Draw current frame
             size_t i = 1;
             while(true) {
-                std::unique_lock<std::mutex> lockGtsam(mMutexGtsamPoses);
-                if(i >= mpvGtsamPoses->size()) {
+                std::unique_lock<std::mutex> lockGtsam(mMutexPoses);
+                if(i >= mpvPoses->size()) {
                     break;
                 }
-                Tw1Gtsam    = getOpenGlMatrix(mpvGtsamPoses->at(i-1));
-                Tw2Gtsam    = getOpenGlMatrix(mpvGtsamPoses->at(i));
+                Tw1Gtsam    = getOpenGlMatrix(mpvPoses->at(i-1));
+                Tw2Gtsam    = getOpenGlMatrix(mpvPoses->at(i));
                 lockGtsam.unlock();
 
                 if(i == 1) {
@@ -195,16 +187,6 @@ namespace SFO {
                 }
                 drawCamera(Tw2Gtsam, green);
                 drawLines(Tw1Gtsam, Tw2Gtsam, green);
-
-                std::unique_lock<std::mutex> lockLibviso2(mMutexLibviso2Poses);
-                Tw1Libviso2 = getOpenGlMatrix(mpvLibviso2Poses->at(i-1));
-                Tw2Libviso2 = getOpenGlMatrix(mpvLibviso2Poses->at(i));
-                lockLibviso2.unlock();
-                if(i == 1) {
-                    drawCamera(Tw1Libviso2, blue);
-                }
-                drawCamera(Tw2Libviso2, blue);
-                drawLines(Tw1Libviso2, Tw2Libviso2, blue);
 
                 if(!mpvGtPoses->empty()) {
                     Tw1Gt = getOpenGlMatrix(mpvGtPoses->at(i - 1));

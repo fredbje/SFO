@@ -1,5 +1,4 @@
 #include <thread>
-#include <gtsamTracker.h>
 #include <opencv/cv.hpp>
 
 #include "libviso2/matrix.h"
@@ -17,17 +16,14 @@ namespace SFO {
         mpTracker = new libviso2::VisualOdometryStereo(mParam);
         mpMapDrawer = new MapDrawer(strSettingsFile);
         mpFrameDrawer = new FrameDrawer(mpTracker, mImgSize);
+        mpGtsamTracker = new GtsamTracker(strSettingsFile);
         mtMapDrawer = std::thread(&MapDrawer::start, mpMapDrawer);
 
         // Initialize trajectory to the origin
-        mGtsamPose = libviso2::Matrix::eye(4);
-        mLibviso2Pose = libviso2::Matrix::eye(4);
-        mpvGtsamPoses = new std::vector<libviso2::Matrix>();
-        mpvLibviso2Poses = new std::vector<libviso2::Matrix>();
-        mpvGtsamPoses->push_back(mGtsamPose);
-        mpvLibviso2Poses->push_back(mLibviso2Pose);
-        mpMapDrawer->updateGtsamPoses(mpvGtsamPoses);
-        mpMapDrawer->updateLibviso2Poses(mpvLibviso2Poses);
+        mPose = libviso2::Matrix::eye(4);
+        mpvPoses = new std::vector<libviso2::Matrix>();
+        mpvPoses->push_back(mPose);
+        mpMapDrawer->updatePoses(mpvPoses);
     }
 
     System::System(const std::string &strSettingsFile, const std::vector<libviso2::Matrix> &vGtPoses) {
@@ -36,25 +32,21 @@ namespace SFO {
         mpTracker = new libviso2::VisualOdometryStereo(mParam);
         mpMapDrawer = new MapDrawer(strSettingsFile, vGtPoses);
         mpFrameDrawer = new FrameDrawer(mpTracker, mImgSize);
+        mpGtsamTracker = new GtsamTracker(strSettingsFile);
         mtMapDrawer = std::thread(&MapDrawer::start, mpMapDrawer);
 
         // Initialize trajectory to the origin
-        mGtsamPose = libviso2::Matrix::eye(4);
-        mLibviso2Pose = libviso2::Matrix::eye(4);
-        mpvGtsamPoses = new std::vector<libviso2::Matrix>();
-        mpvLibviso2Poses = new std::vector<libviso2::Matrix>();
-        mpvGtsamPoses->push_back(mGtsamPose);
-        mpvLibviso2Poses->push_back(mLibviso2Pose);
-        mpMapDrawer->updateGtsamPoses(mpvGtsamPoses);
-        mpMapDrawer->updateLibviso2Poses(mpvLibviso2Poses);
+        mPose = libviso2::Matrix::eye(4);
+        mpvPoses = new std::vector<libviso2::Matrix>();
+        mpvPoses->push_back(mPose);
+        mpMapDrawer->updatePoses(mpvPoses);
     }
 
     System::~System() {
         delete mpTracker;
         delete mpMapDrawer;
         delete mpFrameDrawer;
-        delete mpvGtsamPoses;
-        delete mpvLibviso2Poses;
+        delete mpvPoses;
     }
 
     void System::trackStereo(const cv::Mat &imgLeft, const cv::Mat &imgRight, const double &timestamp) {
@@ -80,18 +72,14 @@ namespace SFO {
             // note: getMotion() returns the last transformation even when process()
             // has failed. this is useful if you wish to linearly extrapolate occasional
             // frames for which no correspondences have been found
-            mLibviso2Pose = mLibviso2Pose * libviso2::Matrix::inv(mpTracker->getMotion());
-            mpvLibviso2Poses->push_back(mLibviso2Pose);
 
-            mGtsamPose = mGtsamPose * libviso2::Matrix::inv(mpTracker->getMotion());
-            GtsamTracker::update(mGtsamPose);
-            GtsamTracker::localOptimization(mvMatches, mvInliers, mpvGtsamPoses);
+            mPose = mPose * libviso2::Matrix::inv(mpTracker->getMotion());
+            mpGtsamTracker->update(mPose, mvMatches, mvInliers);
+            *mpvPoses = mpGtsamTracker->optimize();
 
+            mpvPoses->push_back(mPose);
 
-            mpvGtsamPoses->push_back(mGtsamPose);
-
-            mpMapDrawer->updateLibviso2Poses(mpvLibviso2Poses);
-            mpMapDrawer->updateGtsamPoses(mpvGtsamPoses);
+            mpMapDrawer->updatePoses(mpvPoses);
 
             mpFrameDrawer->update(imgLeft, imgRight);
 
@@ -112,12 +100,10 @@ namespace SFO {
         }
 
         float fx = fSettings["Camera.fx"]; // focal length in pixels
-        float fy = fSettings["Camera.fy"]; // focal length in pixels
         float cx = fSettings["Camera.cx"]; // principal point (x/u-coordinate) in pixels
         float cy = fSettings["Camera.cy"]; // principal point (y/v-coordinate) in pixels
         float bf = fSettings["Camera.bf"];
         float base = bf/fx;                // baseline in meters
-        float s = 0;                       // pixel shear
 
         mImgSize = cv::Size(fSettings["Camera.width"], fSettings["Camera.height"]);
 

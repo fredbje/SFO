@@ -25,6 +25,7 @@
 #include <gtsam/geometry/StereoCamera.h>
 #include <gtsam/geometry/StereoPoint2.h>
 #include <gtsam/slam/StereoFactor.h>
+#include <gtsam/slam/ProjectionFactor.h>
 
 namespace SFO {
     class GtsamTracker {
@@ -35,12 +36,13 @@ namespace SFO {
         ~GtsamTracker();
 
         void cvtMatrix2Gtsam(const libviso2::Matrix &Min, gtsam::Matrix &Mout);
+        libviso2::Matrix cvtGtsam2Matrix(const gtsam::Matrix &Min);
         void cvtMatrix2RT(const libviso2::Matrix &Min, gtsam::Rot3 &R, gtsam::Point3 &T);
         void cvtgtPose2RT(const gtsam::Pose3 &pose, libviso2::Matrix &ptrM);
 
         void update(libviso2::Matrix, const std::vector<libviso2::Matcher::p_match> &vMatches,
                     const std::vector<int32_t> &vInliers);
-        void optimize(std::vector<libviso2::Matrix> *gtsamPoses);
+        std::vector<libviso2::Matrix> optimize();
 
         // From the matched feature pair to previous and current sterepoints
         void getMatchedPairs(const libviso2::Matcher::p_match &match,
@@ -49,13 +51,14 @@ namespace SFO {
     private:
         size_t mPoseId, mLandmarkId;
         void loadCameraMatrix(const std::string &strSettingsFile);
+
         gtsam::Cal3_S2Stereo::shared_ptr mK;
-        //gtsam::noiseModel::Isotropic::shared_ptr mNoiseModel;
-        gtsam::noiseModel::Isotropic::shared_ptr mMeasurementNoise;
+        gtsam::Cal3_S2::shared_ptr mK1, mK2;
+        gtsam::noiseModel::Isotropic::shared_ptr mMeasurementNoise2D, mMeasurementNoise3D;
         gtsam::StereoCamera mStereoCamera;
 
         gtsam::NonlinearFactorGraph mGraph;
-        gtsam::Values mInitialEstimate;
+        gtsam::Values mEstimate;
     };
 }
 #endif //SFO_STEREO_H

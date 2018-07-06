@@ -18,11 +18,9 @@ namespace SFO {
 
         int mFrame;
 
-        libviso2::Matrix mGtsamPose;
-        libviso2::Matrix mLibviso2Pose;
+        libviso2::Matrix mPose;
 
-        std::vector<libviso2::Matrix> *mpvGtsamPoses;
-        std::vector<libviso2::Matrix> *mpvLibviso2Poses;
+        std::vector<libviso2::Matrix> *mpvPoses;;
 
         std::vector<int32_t> mvInliers;
         std::vector<libviso2::Matcher::p_match> mvMatches;
@@ -30,6 +28,7 @@ namespace SFO {
         std::int32_t mDims[3];
 
         libviso2::VisualOdometryStereo::parameters mParam;
+        GtsamTracker *mpGtsamTracker;
         libviso2::VisualOdometryStereo *mpTracker;
         FrameDrawer *mpFrameDrawer;
         MapDrawer *mpMapDrawer;
