@@ -131,8 +131,8 @@ namespace SFO {
                 .SetHandler(handler3D);
 
         // Matrix that changes where the camera is
-        pangolin::OpenGlMatrix Twc;
-        Twc.SetIdentity();
+        pangolin::OpenGlMatrix Tcw;
+        Tcw.SetIdentity();
 
         bool bFollow = true;
 
@@ -146,15 +146,15 @@ namespace SFO {
                 continue;
             }
 
-            Twc = getOpenGlMatrix(mpvPoses->back());
+            Tcw = getOpenGlMatrix(mpvPoses->back());
             if(menuFollowCamera && bFollow)
             {
-                s_cam.Follow(Twc);
+                s_cam.Follow(Tcw);
             }
             else if(menuFollowCamera && !bFollow)
             {
                 s_cam.SetModelViewMatrix(pangolin::ModelViewLookAt(mViewpointX,mViewpointY,mViewpointZ, 0,0,0,0.0,-1.0, 0.0));
-                s_cam.Follow(Twc);
+                s_cam.Follow(Tcw);
                 bFollow = true;
             }
             else if(!menuFollowCamera && bFollow)
@@ -166,10 +166,10 @@ namespace SFO {
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
             // The two poses we are drawing lines between
-            pangolin::OpenGlMatrix Tw1Gtsam;
-            pangolin::OpenGlMatrix Tw2Gtsam;
-            pangolin::OpenGlMatrix Tw1Gt;
-            pangolin::OpenGlMatrix Tw2Gt;
+            pangolin::OpenGlMatrix T1Gtsam;
+            pangolin::OpenGlMatrix T2Gtsam;
+            pangolin::OpenGlMatrix T1Gt;
+            pangolin::OpenGlMatrix T2Gt;
 
             // Draw current frame
             size_t i = 1;
@@ -178,24 +178,24 @@ namespace SFO {
                 if(i >= mpvPoses->size()) {
                     break;
                 }
-                Tw1Gtsam    = getOpenGlMatrix(mpvPoses->at(i-1));
-                Tw2Gtsam    = getOpenGlMatrix(mpvPoses->at(i));
+                T1Gtsam    = getOpenGlMatrix(mpvPoses->at(i-1));
+                T2Gtsam    = getOpenGlMatrix(mpvPoses->at(i));
                 lockGtsam.unlock();
 
                 if(i == 1) {
-                    drawCamera(Tw1Gtsam, green);
+                    drawCamera(T1Gtsam, green);
                 }
-                drawCamera(Tw2Gtsam, green);
-                drawLines(Tw1Gtsam, Tw2Gtsam, green);
+                drawCamera(T2Gtsam, green);
+                drawLines(T1Gtsam, T2Gtsam, green);
 
                 if(!mpvGtPoses->empty()) {
-                    Tw1Gt = getOpenGlMatrix(mpvGtPoses->at(i - 1));
-                    Tw2Gt = getOpenGlMatrix(mpvGtPoses->at(i));
+                    T1Gt = getOpenGlMatrix(mpvGtPoses->at(i - 1));
+                    T2Gt = getOpenGlMatrix(mpvGtPoses->at(i));
                     if (i == 1) {
-                        drawCamera(Tw2Gt, red);
+                        drawCamera(T1Gt, red);
                     }
-                    drawCamera(Tw2Gt, red);
-                    drawLines(Tw1Gt, Tw2Gt, red);
+                    drawCamera(T2Gt, red);
+                    drawLines(T1Gt, T2Gt, red);
                 }
                 i++;
             }

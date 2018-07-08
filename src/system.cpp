@@ -72,12 +72,14 @@ namespace SFO {
             // note: getMotion() returns the last transformation even when process()
             // has failed. this is useful if you wish to linearly extrapolate occasional
             // frames for which no correspondences have been found
+            libviso2::Matrix T_delta = mpTracker->getMotion();
 
-            mPose = mPose * libviso2::Matrix::inv(mpTracker->getMotion());
-            mpGtsamTracker->update(mPose, mvMatches, mvInliers);
+
+            mpGtsamTracker->update(T_delta, mvMatches, mvInliers);
+            //mpGtsamTracker->update(mPose, mvMatches, mvInliers);
             *mpvPoses = mpGtsamTracker->optimize();
 
-            mpvPoses->push_back(mPose);
+            //mpvPoses->push_back(mPose);
 
             mpMapDrawer->updatePoses(mpvPoses);
 

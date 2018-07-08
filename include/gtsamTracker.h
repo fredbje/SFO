@@ -29,12 +29,12 @@ namespace SFO {
 
         ~GtsamTracker();
 
-        void cvtMatrix2Gtsam(const libviso2::Matrix &Min, gtsam::Matrix &Mout);
-        libviso2::Matrix cvtGtsam2Matrix(const gtsam::Matrix &Min);
+        gtsam::Pose3 cvtMatrix2Pose3(const libviso2::Matrix &Min);
+        libviso2::Matrix cvtPose32Matrix(const gtsam::Pose3 &Min);
         void cvtMatrix2RT(const libviso2::Matrix &Min, gtsam::Rot3 &R, gtsam::Point3 &T);
         void cvtgtPose2RT(const gtsam::Pose3 &pose, libviso2::Matrix &ptrM);
 
-        void update(libviso2::Matrix, const std::vector<libviso2::Matcher::p_match> &vMatches,
+        void update(const libviso2::Matrix &T_delta, const std::vector<libviso2::Matcher::p_match> &vMatches,
                     const std::vector<int32_t> &vInliers);
         std::vector<libviso2::Matrix> optimize();
 
@@ -49,6 +49,7 @@ namespace SFO {
         gtsam::Cal3_S2Stereo::shared_ptr mK;
         gtsam::Cal3_S2::shared_ptr mK1, mK2;
         gtsam::noiseModel::Isotropic::shared_ptr mMeasurementNoise2D, mMeasurementNoise3D;
+        gtsam::noiseModel::Diagonal::shared_ptr mOdometryNoise;
         gtsam::StereoCamera mStereoCamera;
 
         gtsam::NonlinearFactorGraph mGraph;
