@@ -28,6 +28,10 @@ namespace SFO {
         delete mpvGtPoses;
     }
 
+    void MapDrawer::setGtPoses(const std::vector<libviso2::Matrix> &vGtPoses) {
+        *mpvGtPoses = vGtPoses;
+    }
+
     void MapDrawer::updatePoses(std::vector<libviso2::Matrix> *pvPoses) {
         std::unique_lock<std::mutex> lock(mMutexPoses);
         mpvPoses->insert(mpvPoses->end(), pvPoses->begin() + mpvPoses->size(), pvPoses->end());
@@ -178,10 +182,10 @@ namespace SFO {
                 if(i >= mpvPoses->size()) {
                     break;
                 }
-                T1Gtsam    = getOpenGlMatrix(mpvPoses->at(i-1));
+
+                T1Gtsam    = getOpenGlMatrix(mpvPoses->at(i - 1));
                 T2Gtsam    = getOpenGlMatrix(mpvPoses->at(i));
                 lockGtsam.unlock();
-
                 if(i == 1) {
                     drawCamera(T1Gtsam, green);
                 }

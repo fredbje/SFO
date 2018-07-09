@@ -26,6 +26,8 @@ namespace SFO {
 
         ~MapDrawer();
 
+        void setGtPoses(const std::vector<libviso2::Matrix> &vGtPoses);
+
         void updatePoses(std::vector<libviso2::Matrix> *pvPoses);
 
         void start();

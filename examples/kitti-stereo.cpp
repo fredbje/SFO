@@ -13,49 +13,7 @@
 #include "mapDrawer.h"
 #include "frameDrawer.h"
 #include "system.h"
-
-struct oxts { // oxts is the brand of the INS used in the KITTI dataset
-    /*
-    lat:           latitude of the oxts-unit (deg)
-    lon:           longitude of the oxts-unit (deg)
-    alt:           altitude of the oxts-unit (m)
-    roll:          roll angle (rad),    0 = level, positive = left side up,      range: -pi   .. +pi
-    pitch:         pitch angle (rad),   0 = level, positive = front down,        range: -pi/2 .. +pi/2
-    yaw:           heading (rad),       0 = east,  positive = counter clockwise, range: -pi   .. +pi
-    vn:            velocity towards north (m/s)
-    ve:            velocity towards east (m/s)
-    vf:            forward velocity, i.e. parallel to earth-surface (m/s)
-    vl:            leftward velocity, i.e. parallel to earth-surface (m/s)
-    vu:            upward velocity, i.e. perpendicular to earth-surface (m/s)
-    ax:            acceleration in x, i.e. in direction of vehicle front (m/s^2)
-    ay:            acceleration in y, i.e. in direction of vehicle left (m/s^2)
-    ay:            acceleration in z, i.e. in direction of vehicle top (m/s^2)
-    af:            forward acceleration (m/s^2)
-    al:            leftward acceleration (m/s^2)
-    au:            upward acceleration (m/s^2)
-    wx:            angular rate around x (rad/s)
-    wy:            angular rate around y (rad/s)
-    wz:            angular rate around z (rad/s)
-    wf:            angular rate around forward axis (rad/s)
-    wl:            angular rate around leftward axis (rad/s)
-    wu:            angular rate around upward axis (rad/s)
-    pos_accuracy:  velocity accuracy (north/east in m)
-    vel_accuracy:  velocity accuracy (north/east in m/s)
-    navstat:       navigation status (see navstat_to_string)
-    numsats:       number of satellites tracked by primary GPS receiver
-    posmode:       position mode of primary GPS receiver (see gps_mode_to_string)
-    velmode:       velocity mode of primary GPS receiver (see gps_mode_to_string)
-    orimode:       orientation mode of primary GPS receiver (see gps_mode_to_string)
-    */
-    double lat, lon, alt,
-            roll, pitch, yaw,
-            vn, ve, vf, vl, vu,
-            ax, ay, az, af, al, au,
-            wx, wy, wz, wf, wl, wu,
-            pos_accuracy, vel_accuracy;
-    int navsat, numsats,
-        posmode, velmode, orimode;
-};
+#include "oxts.h"
 
 void loadImageFileNames(const std::string &strSequenceDir, std::vector<std::string> &vstrLeftImages,
                 std::vector<std::string> &vstrRightImages);
@@ -65,10 +23,12 @@ void loadTimeStamps(const std::string &strTimestampsFile, std::vector<double> &v
 void loadGtPoses(const std::string &strGtPosesFile, std::vector<libviso2::Matrix> &vGtPoses);
 void loadOxtsData(const std::string &strOxtsDir, std::vector<oxts> &vOxtsData);
 
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char **argv){
     if(argc != 6) {
         std::cerr << std::endl << "Usage: ./SFO_main path_to_sequence path_to_settings_file "
-                "path_to_timestamps path_to_gt_poses path_to_oxts" << std::endl;
+                "path_to_timestamps path_to_gt_poses path_to_navdata(oxts)" << std::endl;
         return 1;
     }
 
@@ -101,15 +61,12 @@ int main(int argc, char **argv){
     std::vector<oxts> vOxtsData;
     loadOxtsData(strOxtsDir, vOxtsData);
 
-/////////////////////////////////////////////
-
-
-    SFO::System SLAM(strSettingsFile, vGtPoses);
+    SFO::System SLAM(strSettingsFile, vOxtsData[0], vGtPoses);
     cv::Mat imgLeft;
     cv::Mat imgRight;
     for (std::size_t i = 0; i < 500/*vstrLeftImages.size()*/; i++) { // 4541 images
         readImages(imgLeft, imgRight, vstrLeftImages[i], vstrRightImages[i]);
-        SLAM.trackStereo(imgLeft, imgRight, vTimestamps[i]);
+        SLAM.trackStereo(imgLeft, imgRight, vTimestamps[i], vOxtsData[i]);
     } //end for(int32_t i = 0; i < 4500; i++)
 
     SLAM.shutdown();
@@ -118,6 +75,8 @@ int main(int argc, char **argv){
 
 	return 0;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace bfs = boost::filesystem;
 
@@ -253,7 +212,7 @@ void loadOxtsData(const std::string &strOxtsDir, std::vector<oxts> &vOxtsData){
         return;
     }
     std::vector<std::string> vstrFileNames;
-    for(auto& direntryFile : bfs::directory_iterator(bfs::path(strOxtsDir))) {
+    for(auto &direntryFile : bfs::directory_iterator(bfs::path(strOxtsDir))) {
         if (direntryFile.path().extension() == ".txt") {
             vstrFileNames.emplace_back(direntryFile.path().string());
         } else {
@@ -262,13 +221,13 @@ void loadOxtsData(const std::string &strOxtsDir, std::vector<oxts> &vOxtsData){
         }
     }
     std::sort(vstrFileNames.begin(), vstrFileNames.end());
-    for(auto it = vstrFileNames.begin(); it != vstrFileNames.end(); ++it) {
+    for(const auto &strFileName : vstrFileNames) {
 
         std::ifstream f;
         std::string strLine;
-        f.open(*it, std::ifstream::in);
+        f.open(strFileName, std::ifstream::in);
         if(!f.is_open()){
-            std::cerr << "Error, could not open " << *it << std::endl;
+            std::cerr << "Error, could not open " << strFileName << std::endl;
             return;
         }
         std::getline(f, strLine);
@@ -305,7 +264,7 @@ void loadOxtsData(const std::string &strOxtsDir, std::vector<oxts> &vOxtsData){
                   >> posmode
                   >> velmode
                   >> orimode)) {
-            std::cerr << "Could not read from " << *it << std::endl;
+            std::cerr << "Could not read from " << strFileName << std::endl;
         }
         oxtsData.navsat = static_cast<int>(navsat);
         oxtsData.numsats = static_cast<int>(numsats);

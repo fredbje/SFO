@@ -12,7 +12,10 @@
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Marginals.h> // For noisemodel
+#include <gtsam/nonlinear/ISAM2.h>
 
+#include <GeographicLib/LocalCartesian.hpp>
+#include <GeographicLib/Geocentric.hpp>
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -20,12 +23,13 @@
 #include <libviso2/matcher.h>
 #include <libviso2/viso_stereo.h>
 #include "libviso2/matrix.h"
+#include "oxts.h"
 
 namespace SFO {
     class GtsamTracker {
     public:
 
-        GtsamTracker(const std::string &strSettingsFile);
+        GtsamTracker(const std::string &strSettingsFile, const oxts &navdata0);
 
         ~GtsamTracker();
 
@@ -35,13 +39,15 @@ namespace SFO {
         void cvtgtPose2RT(const gtsam::Pose3 &pose, libviso2::Matrix &ptrM);
 
         void update(const libviso2::Matrix &T_delta, const std::vector<libviso2::Matcher::p_match> &vMatches,
-                    const std::vector<int32_t> &vInliers);
+                    const std::vector<int32_t> &vInliers, const oxts &navdata);
         std::vector<libviso2::Matrix> optimize();
 
         // From the matched feature pair to previous and current sterepoints
         void getMatchedPairs(const libviso2::Matcher::p_match &match,
                           gtsam::StereoPoint2 &p1,
                           gtsam::StereoPoint2 &p2);
+
+        void save();
     private:
         size_t mPoseId, mLandmarkId;
         void loadCameraMatrix(const std::string &strSettingsFile);
@@ -52,8 +58,13 @@ namespace SFO {
         gtsam::noiseModel::Diagonal::shared_ptr mOdometryNoise;
         gtsam::StereoCamera mStereoCamera;
 
+
+
         gtsam::NonlinearFactorGraph mGraph;
         gtsam::Values mEstimate;
+
+        //GeographicLib::Geocentric earth(GeographicLib::Constants::WGS84_a(), GeographicLib::Constants::WGS84_f());
+        GeographicLib::LocalCartesian mProj;
     };
 }
 #endif //SFO_STEREO_H

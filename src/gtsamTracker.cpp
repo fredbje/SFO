@@ -1,3 +1,6 @@
+#include <fstream>
+#include <iomanip> // setprecision
+
 #include <gtsam/nonlinear/Marginals.h>
 #include <opencv2/core/persistence.hpp>
 
@@ -12,29 +15,39 @@
 #include <gtsam/slam/StereoFactor.h>
 #include <gtsam/slam/ProjectionFactor.h>
 #include <gtsam/slam/PriorFactor.h>
+#include <gtsam/slam/PoseTranslationPrior.h>
+#include <gtsam/slam/PoseRotationPrior.h>
 #include <gtsam/slam/BetweenFactor.h>
 
+//#include <GeographicLib/Geocentric.hpp>
 
 #include "gtsamTracker.h"
 
 namespace SFO {
-    GtsamTracker::GtsamTracker(const std::string &strSettingsFile) {
-        loadCameraMatrix(strSettingsFile);
-        mMeasurementNoise3D = gtsam::noiseModel::Isotropic::Sigma(3, 1);
-        mMeasurementNoise2D = gtsam::noiseModel::Isotropic::Sigma(2, 1); // 1 pixel in u and v
-        gtsam::Pose3 initialPose; // Origin is default constructor
-        mStereoCamera = gtsam::StereoCamera(initialPose, mK);
+    GtsamTracker::GtsamTracker(const std::string &strSettingsFile, const oxts &navdata0) {
+        mProj.Reset(navdata0.lat, navdata0.lon, navdata0.alt);
+
+        double x0, y0, z0;
+        mProj.Forward(navdata0.lat, navdata0.lon, navdata0.alt, x0, y0, z0);
+        std::cout << "Initial global coordinates: " << std::setprecision(14) << navdata0.lat << ", " << navdata0.lon << ", " << navdata0.alt << std::endl;
+        std::cout << "Initial local coordinates: " << x0 << ", " << y0 << ", " << z0 << std::endl;
+
         mPoseId = 0;
-        mLandmarkId = 1;
-        //mEstimate.insert(gtsam::Symbol('x', mPoseId++), mStereoCamera.pose());
 
-        gtsam::Pose3 priorMean; // Origin is default constructor
-        gtsam::noiseModel::Diagonal::shared_ptr priorNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << gtsam::Vector3::Constant(0.3), gtsam::Vector3::Constant(0.1)).finished()); // 30cm std on x,y,z 0.1 rad on roll,pitch,yaw
+        gtsam::Pose3 initialPoseEstimate; // Origin is default constructor
+        //gtsam::noiseModel::Diagonal::shared_ptr priorNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << gtsam::Vector3::Constant(0.3), gtsam::Vector3::Constant(0.1)).finished()); // 30cm std on x,y,z 0.1 rad on roll,pitch,yaw
+
         mOdometryNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << gtsam::Vector3::Constant(0.1), gtsam::Vector3::Constant(0.05)).finished()); // 10cm std on x,y,z 0.05 rad on roll,pitch,yaw
-        mEstimate.insert(gtsam::Symbol('x', mPoseId), priorMean);
-        mGraph.emplace_shared<gtsam::PriorFactor<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId++), priorMean, priorNoise);
 
+        mEstimate.insert(gtsam::Symbol('x', mPoseId), initialPoseEstimate);
+        gtsam::noiseModel::Diagonal::shared_ptr priorTranslationNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(1, 1, 1)); // 1 m in x, y and z
+        mGraph.emplace_shared<gtsam::PoseTranslationPrior<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId), initialPoseEstimate, priorTranslationNoise); // No prior on rotation. Translation prior uses only translation part of pose
 
+        /*
+        gtsam::noiseModel::Diagonal::shared_ptr priorRotationNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(3, 3, 3));
+        mGraph.emplace_shared<gtsam::PoseRotationPrior<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId), initialPoseEstimate, priorRotationNoise);
+         */
+        mPoseId++;
         //mGraph.emplace_shared<gtsam::NonlinearEquality<gtsam::Pose3> >(gtsam::Symbol('x',1), mStereoCamera.pose());
     }
 
@@ -49,13 +62,24 @@ namespace SFO {
     }
 
     void GtsamTracker::update(const libviso2::Matrix &T_delta, const std::vector<libviso2::Matcher::p_match> &vMatches,
-                              const std::vector<int32_t> &vInliers) {
+                              const std::vector<int32_t> &vInliers, const oxts &navdata) {
+
+
+
+        double x, y, z;
+        mProj.Forward(navdata.lat, navdata.lon, navdata.alt, x, y, z);
+        gtsam::noiseModel::Diagonal::shared_ptr priorTranslationNoise = gtsam::noiseModel::Diagonal::Sigmas(
+                gtsam::Vector3(1, 1, 1)); // 1m on x, y, z
+        mGraph.emplace_shared<gtsam::PoseTranslationPrior<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId),
+                                                                          gtsam::Point3(x, y, z),
+                                                                          priorTranslationNoise);
+
         // TODO adjust noise based on outlier to inlier ratio (or something)
         gtsam::Pose3 pose3T_delta = cvtMatrix2Pose3(T_delta);
-        mGraph.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId), gtsam::Symbol('x', mPoseId-1), pose3T_delta, mOdometryNoise); // TODO Why do we need to reverse the direction?
+        mGraph.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId-1), gtsam::Symbol('x', mPoseId), pose3T_delta, mOdometryNoise); // TODO Why do we need to reverse the direction?
         //mStereoCamera = gtsam::StereoCamera(gtsamPose, mK);
         gtsam::Pose3 lastPose = mEstimate.at<gtsam::Pose3>(gtsam::Symbol('x', mPoseId-1));
-        mEstimate.insert(gtsam::Symbol('x', mPoseId++), pose3T_delta * lastPose);
+        mEstimate.insert(gtsam::Symbol('x', mPoseId++), lastPose * pose3T_delta);
 
         /*
         gtsam::StereoPoint2 spt1, spt2;
@@ -108,7 +132,34 @@ namespace SFO {
     }
 
     std::vector<libviso2::Matrix> GtsamTracker::optimize() {
-        mEstimate = gtsam::LevenbergMarquardtOptimizer(mGraph, mEstimate).optimize();
+/*
+        gtsam::ISAM2Params parameters;
+        parameters.relinearizeThreshold = 0.01;
+        parameters.relinearizeSkip = 1;
+        gtsam::ISAM2 isam(parameters);
+
+
+        if((mPoseId % 100) == 0) {
+            isam.update(mGraph, mEstimate);
+            mEstimate = isam.calculateBestEstimate();
+        }else if ((mPoseId % 20) == 0){
+            isam.update(mGraph, mEstimate);
+            mEstimate = isam.calculateEstimate();
+        }
+
+*/
+
+
+
+        gtsam::LevenbergMarquardtParams params;
+        //params.orderingType = gtsam::Ordering::METIS;
+        params.maxIterations = 1000;
+        mEstimate = gtsam::LevenbergMarquardtOptimizer(mGraph, mEstimate, params).optimize();
+
+
+
+
+        //mEstimate = gtsam::LevenbergMarquardtOptimizer(mGraph, mEstimate).optimize();
         std::vector<libviso2::Matrix> poses;
         for(size_t i = 0; i < mPoseId; i++) {
             gtsam::Pose3 tempPose = mEstimate.at<gtsam::Pose3>(gtsam::Symbol('x', i));
@@ -147,17 +198,26 @@ namespace SFO {
 
 
     gtsam::Pose3 GtsamTracker::cvtMatrix2Pose3(const libviso2::Matrix &Min) {
+        auto R = gtsam::Rot3(Min.val[0][0], Min.val[0][1],Min.val[0][2],
+                        Min.val[1][0], Min.val[1][1],Min.val[1][2],
+                        Min.val[2][0], Min.val[2][1],Min.val[2][2]);
+        auto t = gtsam::Point3(Min.val[0][3], Min.val[1][3], Min.val[2][3]);
+
+        gtsam::Pose3 Mout(R, t);
+        return Mout;
+
+        /*
         long m = Min.m;
         long n = Min.n;
-
         gtsam::Matrix Mout(Min.m, Min.n);
-
         for (int i=0;i<m; i++){
             for (int j=0;j<n;j++){
                 Mout(i,j) = Min.val[i][j];
             }
         }
         return gtsam::Pose3(Mout);
+        */
+
     }
 
 
@@ -192,5 +252,17 @@ namespace SFO {
         mK = gtsam::Cal3_S2Stereo::shared_ptr(new gtsam::Cal3_S2Stereo(fx, fy, s, cx, cy, base));
         mK1 = gtsam::Cal3_S2::shared_ptr(new gtsam::Cal3_S2(fx, fy, s, cx, cy));
         mK2 = gtsam::Cal3_S2::shared_ptr(new gtsam::Cal3_S2(fx, fy, s, cx, cy));
+    }
+
+    void GtsamTracker::save() {
+        std::ofstream f;
+        f.open("output.txt");
+
+        for(size_t i = 0; i < mPoseId; i++) {
+            gtsam::Pose3 tempPose = mEstimate.at<gtsam::Pose3>(gtsam::Symbol('x', i));
+            double lat, lon, h;
+            mProj.Reverse(tempPose.x(), tempPose.y(), tempPose.z(), lat, lon, h);
+            f << std::setprecision(14) << lat << " " << lon << "\n";
+        }
     }
 }

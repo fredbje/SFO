@@ -1,14 +1,16 @@
 #ifndef SFO_SYSTEM_H
 #define SFO_SYSTEM_H
 
+#include "oxts.h"
+
 namespace SFO {
     class System {
     public:
 
-        System(const std::string &strSettingsFile);
-        System(const std::string &strSettingsFile, const std::vector<libviso2::Matrix> &vGtPoses);
+        System(const std::string &strSettingsFile, const oxts &navdata0);
+        System(const std::string &strSettingsFile, const oxts &navdata0, const std::vector<libviso2::Matrix> &vGtPoses);
         ~System();
-        void trackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp);
+        void trackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const oxts &navdata);
         void shutdown();
 
     private:
