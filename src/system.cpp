@@ -54,7 +54,7 @@ namespace SFO {
             mvMatches = mpTracker->getMatches();
             mvInliers = mpTracker->getInlierIndices();
 
-            // inv(getMotion()) returns {t-1}^T_{t}. Right multiply with last pose to get {0/w}^T_{t}
+            // inv(getMotion()) returns {t-1}^T_{t}. Right multiply with last pose to get {0}^T_{t}
             libviso2::Matrix T_delta = libviso2::Matrix::inv(mpTracker->getMotion());
             mpGtsamTracker->update(T_delta, mvMatches, mvInliers, navdata);
             *mpvPoses = mpGtsamTracker->optimize();

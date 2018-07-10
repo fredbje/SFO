@@ -29,9 +29,7 @@ using namespace std;
     matcher->setIntrinsics(param.calib.f,param.calib.cu,param.calib.cv,param.base);
   }
 
-  VisualOdometryStereo::~VisualOdometryStereo() {
-      
-  }
+  VisualOdometryStereo::~VisualOdometryStereo() = default;
 
   bool VisualOdometryStereo::process (uint8_t *I1, uint8_t *I2, int32_t* dims, bool replace) {
     

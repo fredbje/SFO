@@ -703,8 +703,8 @@ namespace libviso2 {
     // get number of interest points and init maxima pointer to NULL
     num1 = maxima1.size();
     num2 = maxima2.size();
-    max1 = 0;
-    max2 = 0;
+    max1 = nullptr;
+    max2 = nullptr;
     
     int32_t s = 1;
     if (param.half_resolution)
@@ -1234,29 +1234,29 @@ namespace libviso2 {
     
     // input parameters
     in.numberofpointattributes = 0;
-    in.pointattributelist      = NULL;
-    in.pointmarkerlist         = NULL;
+    in.pointattributelist      = nullptr;
+    in.pointmarkerlist         = nullptr;
     in.numberofsegments        = 0;
     in.numberofholes           = 0;
     in.numberofregions         = 0;
-    in.regionlist              = NULL;
+    in.regionlist              = nullptr;
     
     // outputs
-    out.pointlist              = NULL;
-    out.pointattributelist     = NULL;
-    out.pointmarkerlist        = NULL;
-    out.trianglelist           = NULL;
-    out.triangleattributelist  = NULL;
-    out.neighborlist           = NULL;
-    out.segmentlist            = NULL;
-    out.segmentmarkerlist      = NULL;
-    out.edgelist               = NULL;
-    out.edgemarkerlist         = NULL;
+    out.pointlist              = nullptr;
+    out.pointattributelist     = nullptr;
+    out.pointmarkerlist        = nullptr;
+    out.trianglelist           = nullptr;
+    out.triangleattributelist  = nullptr;
+    out.neighborlist           = nullptr;
+    out.segmentlist            = nullptr;
+    out.segmentmarkerlist      = nullptr;
+    out.edgelist               = nullptr;
+    out.edgemarkerlist         = nullptr;
 
     // do triangulation (z=zero-based, n=neighbors, Q=quiet, B=no boundary markers)
     // attention: not using the B switch or using the n switch creates a memory leak (=> use valgrind!)
     char parameters[] = "zQB";
-    triangulate(parameters, &in, &out, NULL);
+    triangulate(parameters, &in, &out, nullptr);
     
     // for all triangles do
     for (int32_t i=0; i<out.numberoftriangles; i++) {

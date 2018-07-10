@@ -174,6 +174,39 @@ void loadGtPoses(const std::string &strGtPosesFile, std::vector<libviso2::Matrix
         std::cerr << "Error, could not open ground truth pose file!" << std::endl;
     }
 
+    // Data collected from KITTI calibration files
+    libviso2::Matrix cam_T_velo(4, 4);
+    cam_T_velo.val[0][0] = 7.967514e-03;  cam_T_velo.val[0][1] = -9.999679e-01; cam_T_velo.val[0][2] = -8.462264e-04; cam_T_velo.val[0][3] = -1.377769e-02;
+    cam_T_velo.val[1][0] = -2.771053e-03; cam_T_velo.val[1][1] = 8.241710e-04;  cam_T_velo.val[1][2] = -9.999958e-01; cam_T_velo.val[1][3] = -5.542117e-02;
+    cam_T_velo.val[2][0] = 9.999644e-01;  cam_T_velo.val[2][1] = 7.969825e-03;  cam_T_velo.val[2][2] = -2.764397e-03; cam_T_velo.val[2][3] = -2.918589e-01;
+    cam_T_velo.val[3][0] = 0.0;           cam_T_velo.val[3][1] = 0.0;           cam_T_velo.val[3][2] = 0.0;           cam_T_velo.val[3][3] = 1.0;
+
+    libviso2::Matrix velo_T_gps(4, 4);
+    velo_T_gps.val[0][0] = 9.999976e-01;  velo_T_gps.val[0][1] = 7.553071e-04; velo_T_gps.val[0][2] = -2.035826e-03; velo_T_gps.val[0][3] = -8.086759e-01;
+    velo_T_gps.val[1][0] = -7.854027e-04; velo_T_gps.val[1][1] = 9.998898e-01; velo_T_gps.val[1][2] = -1.482298e-02; velo_T_gps.val[1][3] = 3.195559e-01;
+    velo_T_gps.val[2][0] = 2.024406e-03;  velo_T_gps.val[2][1] = 1.482454e-02; velo_T_gps.val[2][2] = 9.998881e-01;  velo_T_gps.val[2][3] = -7.997231e-01;
+    velo_T_gps.val[3][0] = 0.0;           velo_T_gps.val[3][1] = 0.0;          velo_T_gps.val[3][2] = 0.0;           velo_T_gps.val[3][3] = 1.0;
+
+    /*
+    libviso2::Matrix transMat(4, 4);
+    transMat.val[0][2] = 1;
+    transMat.val[1][0] = -1;
+    transMat.val[2][1] = -1;
+    transMat.val[3][3] = 1;
+    */
+
+    libviso2::Matrix cam_T_gps = cam_T_velo * velo_T_gps;
+    libviso2::Matrix gps_T_cam = libviso2::Matrix::inv(cam_T_gps);
+
+    // Data collected from oxts data frame 1.
+    libviso2::Matrix enu_R_gps = libviso2::Matrix::rotMatX(0.0)    // Roll
+                                 * libviso2::Matrix::rotMatY(0.0)  // Pitch
+                                 * libviso2::Matrix::rotMatZ(1.03959632679490); // Yaw
+
+    libviso2::Matrix enu_T_gps = libviso2::Matrix(4, 4);
+    enu_T_gps.setMat(enu_R_gps, 0, 0);
+    enu_T_gps.val[3][3] = 1.0;
+
     while(std::getline(f, strLine)) {
         std::istringstream iss(strLine);
         double r11, r12, r13, r21, r22, r23, r31, r32, r33, t1, t2, t3;
@@ -199,6 +232,7 @@ void loadGtPoses(const std::string &strGtPosesFile, std::vector<libviso2::Matrix
         tempPose.val[3][1] = 0;
         tempPose.val[3][2] = 0;
         tempPose.val[3][3] = 1;
+        tempPose = enu_T_gps * gps_T_cam * tempPose ;
         vGtPoses.push_back(tempPose);
     }
     std::cout << "Finished loading GT poses." << std::endl;

@@ -34,7 +34,8 @@ namespace SFO {
 
     void MapDrawer::updatePoses(std::vector<libviso2::Matrix> *pvPoses) {
         std::unique_lock<std::mutex> lock(mMutexPoses);
-        mpvPoses->insert(mpvPoses->end(), pvPoses->begin() + mpvPoses->size(), pvPoses->end());
+        *mpvPoses = *pvPoses;
+        //mpvPoses->insert(mpvPoses->end(), pvPoses->begin() + mpvPoses->size(), pvPoses->end());
     }
 
     

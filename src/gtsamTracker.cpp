@@ -10,8 +10,6 @@
 #include <gtsam/nonlinear/ISAM2.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
 
-
-
 #include <gtsam/slam/StereoFactor.h>
 #include <gtsam/slam/ProjectionFactor.h>
 #include <gtsam/slam/PriorFactor.h>
@@ -66,17 +64,19 @@ namespace SFO {
 
 
 
-        double x, y, z;
-        mProj.Forward(navdata.lat, navdata.lon, navdata.alt, x, y, z);
-        gtsam::noiseModel::Diagonal::shared_ptr priorTranslationNoise = gtsam::noiseModel::Diagonal::Sigmas(
-                gtsam::Vector3(1, 1, 1)); // 1m on x, y, z
-        mGraph.emplace_shared<gtsam::PoseTranslationPrior<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId),
-                                                                          gtsam::Point3(x, y, z),
-                                                                          priorTranslationNoise);
+        if((mPoseId % 10) == 0) {
+            double x, y, z;
+            mProj.Forward(navdata.lat, navdata.lon, navdata.alt, x, y, z);
+            gtsam::noiseModel::Diagonal::shared_ptr priorTranslationNoise = gtsam::noiseModel::Diagonal::Sigmas(
+                    gtsam::Vector3(1, 1, 1)); // 1m on x, y, z
+            mGraph.emplace_shared<gtsam::PoseTranslationPrior<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId),
+                                                                              gtsam::Point3(x, y, z),
+                                                                              priorTranslationNoise);
+        }
 
         // TODO adjust noise based on outlier to inlier ratio (or something)
         gtsam::Pose3 pose3T_delta = cvtMatrix2Pose3(T_delta);
-        mGraph.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId-1), gtsam::Symbol('x', mPoseId), pose3T_delta, mOdometryNoise); // TODO Why do we need to reverse the direction?
+        mGraph.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId-1), gtsam::Symbol('x', mPoseId), pose3T_delta, mOdometryNoise);
         //mStereoCamera = gtsam::StereoCamera(gtsamPose, mK);
         gtsam::Pose3 lastPose = mEstimate.at<gtsam::Pose3>(gtsam::Symbol('x', mPoseId-1));
         mEstimate.insert(gtsam::Symbol('x', mPoseId++), lastPose * pose3T_delta);
