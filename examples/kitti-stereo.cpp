@@ -14,6 +14,7 @@
 #include "frameDrawer.h"
 #include "system.h"
 #include "oxts.h"
+//#include "tracking.h"
 
 void loadImageFileNames(const std::string &strSequenceDir, std::vector<std::string> &vstrLeftImages,
                 std::vector<std::string> &vstrRightImages);
@@ -64,12 +65,14 @@ int main(int argc, char **argv){
     SFO::System SLAM(strSettingsFile, vOxtsData[0], vGtPoses);
     cv::Mat imgLeft;
     cv::Mat imgRight;
+    //SFO::Tracking tracker(strSettingsFile);
     for (std::size_t i = 0; i < 500/*vstrLeftImages.size()*/; i++) { // 4541 images
         readImages(imgLeft, imgRight, vstrLeftImages[i], vstrRightImages[i]);
+        //tracker.track(imgLeft, imgRight, 0);
         SLAM.trackStereo(imgLeft, imgRight, vTimestamps[i], vOxtsData[i]);
     } //end for(int32_t i = 0; i < 4500; i++)
 
-    SLAM.shutdown();
+    //SLAM.shutdown();
 
     std::cout << "SFO_main complete! Exiting ..." << std::endl;
 
@@ -199,8 +202,8 @@ void loadGtPoses(const std::string &strGtPosesFile, std::vector<libviso2::Matrix
     libviso2::Matrix gps_T_cam = libviso2::Matrix::inv(cam_T_gps);
 
     // Data collected from oxts data frame 1.
-    libviso2::Matrix enu_R_gps = libviso2::Matrix::rotMatX(0.0)    // Roll
-                                 * libviso2::Matrix::rotMatY(0.0)  // Pitch
+    libviso2::Matrix enu_R_gps = libviso2::Matrix::rotMatX(0.04220300000000)    // Roll
+                                 * libviso2::Matrix::rotMatY(0.02227500000000)  // Pitch
                                  * libviso2::Matrix::rotMatZ(1.03959632679490); // Yaw
 
     libviso2::Matrix enu_T_gps = libviso2::Matrix(4, 4);

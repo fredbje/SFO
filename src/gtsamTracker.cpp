@@ -4,7 +4,6 @@
 #include <gtsam/nonlinear/Marginals.h>
 #include <opencv2/core/persistence.hpp>
 
-
 #include <gtsam/inference/Symbol.h>
 #include <gtsam/nonlinear/NonlinearEquality.h>
 #include <gtsam/nonlinear/ISAM2.h>
@@ -38,7 +37,7 @@ namespace SFO {
         mOdometryNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << gtsam::Vector3::Constant(0.1), gtsam::Vector3::Constant(0.05)).finished()); // 10cm std on x,y,z 0.05 rad on roll,pitch,yaw
 
         mEstimate.insert(gtsam::Symbol('x', mPoseId), initialPoseEstimate);
-        gtsam::noiseModel::Diagonal::shared_ptr priorTranslationNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(1, 1, 1)); // 1 m in x, y and z
+        gtsam::noiseModel::Diagonal::shared_ptr priorTranslationNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(navdata0.pos_accuracy, navdata0.pos_accuracy, navdata0.pos_accuracy)); // 1 m in x, y and z
         mGraph.emplace_shared<gtsam::PoseTranslationPrior<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId), initialPoseEstimate, priorTranslationNoise); // No prior on rotation. Translation prior uses only translation part of pose
 
         /*
@@ -68,7 +67,7 @@ namespace SFO {
             double x, y, z;
             mProj.Forward(navdata.lat, navdata.lon, navdata.alt, x, y, z);
             gtsam::noiseModel::Diagonal::shared_ptr priorTranslationNoise = gtsam::noiseModel::Diagonal::Sigmas(
-                    gtsam::Vector3(1, 1, 1)); // 1m on x, y, z
+                    gtsam::Vector3(navdata.pos_accuracy, navdata.pos_accuracy, navdata.pos_accuracy)); // pos_accuracy[m] on x, y, z
             mGraph.emplace_shared<gtsam::PoseTranslationPrior<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId),
                                                                               gtsam::Point3(x, y, z),
                                                                               priorTranslationNoise);

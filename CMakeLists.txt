@@ -14,7 +14,7 @@ find_package(GTSAM REQUIRED)
 #find_package(PCL 1.8 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS thread)
 #find_package(Boost REQUIRED COMPONENTS system serialization system filesystem thread program_options date_time regex timer chrono)
-find_package(OpenCV 3 REQUIRED core imgcodecs videoio ximgproc)
+find_package(OpenCV 3 REQUIRED core imgcodecs videoio ximgproc features2d xfeatures2d)
 find_package(GeographicLib 1.34 REQUIRED)
 find_package(Pangolin REQUIRED)
 #find_package(X11 REQUIRED)
@@ -64,16 +64,24 @@ include_directories(
 )
 
 # Include all thirdparty source files in build
-file(GLOB_RECURSE sources_thirdparty thirdparty/*.cpp)
+file(GLOB_RECURSE sources_thirdparty thirdparty/libviso2/*.cpp)
 
 #####################################
 # Main class files
 #####################################
 set(sources_SFO
         src/gtsamTracker.cpp
-    src/mapDrawer.cpp
-    src/frameDrawer.cpp
-    src/system.cpp
+        src/mapDrawer.cpp
+        src/frameDrawer.cpp
+        src/system.cpp
+)
+
+set(sources_ORB
+#        src/tracking.cpp
+#        src/ORBextractor.cc
+#        src/ORBmatcher.cc
+#        src/Frame.cc
+#        src/Converter.cc
 )
 
 
@@ -82,6 +90,7 @@ add_executable(kitti-stereo
         examples/kitti-stereo.cpp
         ${sources_SFO}
         ${sources_thirdparty}
+        #${sources_ORB}
 )
 
 target_link_libraries(kitti-stereo
@@ -97,6 +106,7 @@ target_link_libraries(kitti-stereo
         ${Boost_LIBRARIES}
         ${OpenCV_LIBRARIES}
         ${GeographicLib_LIBRARIES}
+        ${PROJECT_SOURCE_DIR}/thirdparty/DBoW2/lib/libDBoW2.so
 )
 
 # Test main for running GTSAM code
