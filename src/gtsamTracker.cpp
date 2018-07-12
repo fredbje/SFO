@@ -16,8 +16,6 @@
 #include <gtsam/slam/PoseRotationPrior.h>
 #include <gtsam/slam/BetweenFactor.h>
 
-//#include <GeographicLib/Geocentric.hpp>
-
 #include "gtsamTracker.h"
 
 namespace SFO {
