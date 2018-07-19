@@ -1,14 +1,24 @@
 #ifndef SFO_SYSTEM_H
 #define SFO_SYSTEM_H
 
+#include <thread>
+#include "libviso2/matrix.h"
+#include "libviso2/viso_stereo.h"
 #include "oxts.h"
+
+#include "orbExtractor.h"
+#include "loopDetector.h"
+
+#include "DBoW2/include/TemplatedVocabulary.h"
+#include "DBoW2/include/FClass.h"
 
 namespace SFO {
     class System {
     public:
 
-        System(const std::string &strSettingsFile, const oxts &navdata0);
-        System(const std::string &strSettingsFile, const oxts &navdata0, const std::vector<libviso2::Matrix> &vGtPoses);
+        System(const std::string &strSettingsFile, const std::string &strVocabularyFile, const oxts &navdata0, const libviso2::Matrix &imu_T_cam);
+        System(const std::string &strSettingsFile, const std::string &strVocabularyFile, const oxts &navdata0, const libviso2::Matrix &imu_T_cam,
+               const std::vector<libviso2::Matrix> &vGtPoses);
         ~System();
         void trackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const oxts &navdata);
         void shutdown();
@@ -33,10 +43,13 @@ namespace SFO {
         GtsamTracker *mpGtsamTracker;
         libviso2::VisualOdometryStereo *mpTracker;
         FrameDrawer *mpFrameDrawer;
+        std::thread mtFrameDrawer;
         MapDrawer *mpMapDrawer;
         std::thread mtMapDrawer;
 
         float mFps, mT;
+
+        LoopDetector *mpLoopDetector;
     };
 
 } // namespace SFO

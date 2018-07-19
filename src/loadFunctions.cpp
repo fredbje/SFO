@@ -237,7 +237,6 @@ libviso2::Matrix loadCam2ImuTransform(const std::string &strImu2VeloCalibFile, c
         velo_T_imu.val[2][0] = r31; velo_T_imu.val[2][1] = r32; velo_T_imu.val[2][2] = r33; velo_T_imu.val[2][3] = t3;
         velo_T_imu.val[3][0] = 0.0; velo_T_imu.val[3][1] = 0.0; velo_T_imu.val[3][2] = 0.0; velo_T_imu.val[3][3] = 1.0;
     }
-    std::cout << velo_T_imu << std::endl << std::endl;
 
     libviso2::Matrix cam_T_velo(4, 4);
     {
@@ -261,11 +260,11 @@ libviso2::Matrix loadCam2ImuTransform(const std::string &strImu2VeloCalibFile, c
         cam_T_velo.val[2][0] = r31; cam_T_velo.val[2][1] = r32; cam_T_velo.val[2][2] = r33; cam_T_velo.val[2][3] = t3;
         cam_T_velo.val[3][0] = 0.0; cam_T_velo.val[3][1] = 0.0; cam_T_velo.val[3][2] = 0.0; cam_T_velo.val[3][3] = 1.0;
     }
-    std::cout << cam_T_velo << std::endl;
 
 
     libviso2::Matrix cam_T_imu = cam_T_velo * velo_T_imu;
     libviso2::Matrix imu_T_cam = libviso2::Matrix::inv(cam_T_imu);
+    std::cout << "Loaded camera to imu frame transformation." << std::endl;
     return imu_T_cam;
 
 }

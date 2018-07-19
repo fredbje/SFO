@@ -53,7 +53,16 @@ include_directories(
 )
 
 # Include all thirdparty source files in build
-file(GLOB_RECURSE sources_thirdparty thirdparty/libviso2/*.cpp)
+set(sources_thirdparty
+        thirdparty/libviso2/filter.cpp
+        thirdparty/libviso2/matcher.cpp
+        thirdparty/libviso2/matrix.cpp
+        thirdparty/libviso2/viso.cpp
+        thirdparty/libviso2/viso_stereo.cpp
+        thirdparty/libviso2/triangle.cpp
+
+        thirdparty/ORB_SLAM2/ORBextractor.cc
+)
 
 #####################################
 # Main class files
@@ -64,14 +73,8 @@ set(sources_SFO
         src/frameDrawer.cpp
         src/system.cpp
         src/loadFunctions.cpp
-)
-
-set(sources_ORB
-#        src/tracking.cpp
-#        src/ORBextractor.cc
-#        src/ORBmatcher.cc
-#        src/Frame.cc
-#        src/Converter.cc
+        src/loopDetector.cpp
+        src/orbExtractor.cpp
 )
 
 
@@ -80,7 +83,6 @@ add_executable(kitti-stereo
         examples/kitti-stereo.cpp
         ${sources_SFO}
         ${sources_thirdparty}
-        #${sources_ORB}
 )
 
 target_link_libraries(kitti-stereo
@@ -92,5 +94,6 @@ target_link_libraries(kitti-stereo
         ${GeographicLib_LIBRARIES}
 
         ${PROJECT_SOURCE_DIR}/thirdparty/DBoW2/lib/libDBoW2.so
+        ${PROJECT_SOURCE_DIR}/thirdparty/DLib/lib/libDLib.so
 )
 

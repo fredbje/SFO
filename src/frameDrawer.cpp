@@ -1,29 +1,69 @@
 #include "frameDrawer.h"
 #include <opencv2/imgproc/imgproc.hpp> // cvtcolor
-#include <iomanip>
+#include <iomanip> // setprecision
+#include <opencv/cv.hpp> // imshow
 
 namespace SFO {
-    FrameDrawer::FrameDrawer(libviso2::VisualOdometryStereo *pTracker, const cv::Size &szImgSize)
-            : mpTracker(pTracker) {
-        mszImgSize = szImgSize;
+    FrameDrawer::FrameDrawer(const std::string &strSettingsFile) {
+        cv::FileStorage fSettings(strSettingsFile, cv::FileStorage::READ);
+        if (!fSettings.isOpened()) {
+            std::cerr << "Failed to open settings file at: " << strSettingsFile
+                      << " in FrameDrawer constructor." << std::endl;
+        }
+        float fps = fSettings["Camera.fps"];
+        mT = (fps == 0) ? 10 : 1/fps;
+        mHeight = fSettings["Camera.height"];
+        mWidth = fSettings["Camera.width"];
+
         int textHeight = 20; // Actually 10, but leaving som space over and under
         int borderHeight = 5; // Border between images
-        mImgDisplay = cv::Mat(2*szImgSize.height + borderHeight + textHeight, szImgSize.width, CV_8UC3);
-        mImgDisplayUpper = cv::Mat(mImgDisplay, cv::Rect(0, 0, szImgSize.width, szImgSize.height));
-        mImgDisplayLower = cv::Mat(mImgDisplay, cv::Rect(0, szImgSize.height + borderHeight, szImgSize.width, szImgSize.height));
+        mImgDisplay = cv::Mat(2*mHeight + borderHeight + textHeight, mWidth, CV_8UC3);
+        mImgDisplayUpper = cv::Mat(mImgDisplay, cv::Rect(0, 0, mWidth, mHeight));
+        mImgDisplayLower = cv::Mat(mImgDisplay, cv::Rect(0, mHeight + borderHeight, mWidth, mHeight));
     }
 
-    void FrameDrawer::update(const cv::Mat &imgLeft, const cv::Mat &imgRight) {
-        std::unique_lock<std::mutex> lock(mMutexUpdate);
+    FrameDrawer::~FrameDrawer() {
+        std::cout << "FrameDrawer destructor called." << std::endl;
+    }
+
+    void FrameDrawer::update(const cv::Mat &imgLeft,
+                             const cv::Mat &imgRight,
+                             const std::vector<libviso2::Matcher::p_match> &vMatches,
+                             const std::vector<int32_t> &vInliers) {
+        std::unique_lock<std::mutex> lock(mMutex);
         cv::cvtColor(imgLeft, mImgDisplayUpper, CV_GRAY2RGB);
         cv::cvtColor(imgRight, mImgDisplayLower, CV_GRAY2RGB);
-        mvMatches = mpTracker->getMatches();
-        mvInliers = mpTracker->getInlierIndices();
-        mnMatches = mpTracker->getNumberOfMatches();
-        mnInliers = mpTracker->getNumberOfInliers();
+        mvMatches = vMatches;
+        mvInliers = vInliers;
+        mnMatches = vMatches.size();
+        mnInliers = vInliers.size();
     }
 
-    const cv::Mat FrameDrawer::drawFrame() {
+    void FrameDrawer::run() {
+        while(true) {
+            std::unique_lock<std::mutex> lock(mMutex);
+            drawFrame();
+            lock.unlock();
+            cv::imshow("Stereo Gray Image", mImgDisplay);
+            cv::waitKey(static_cast<int>(0.1*1e3)); //mT*1e3
+            if(checkFinish()) {
+                break;
+            }
+        }
+        std::cout << "Exiting FrameDrawer thread." << std::endl;
+    }
+
+    void FrameDrawer::requestFinish() {
+        std::unique_lock<std::mutex> lock(mMutexFinish);
+        mbFinishRequested = true;
+    }
+
+    bool FrameDrawer::checkFinish() {
+        std::unique_lock<std::mutex> lock(mMutexFinish);
+        return mbFinishRequested;
+    }
+
+    void FrameDrawer::drawFrame() {
         for (std::size_t j = 0; j < mvMatches.size(); j++) {
             cv::Scalar color;
             if (std::find(mvInliers.begin(), mvInliers.end(), j) != mvInliers.end()) {
@@ -38,15 +78,15 @@ namespace SFO {
             cv::circle(mImgDisplayLower, pt_right, 2, color);
         }
         drawText();
-        return mImgDisplay;
     }
 
     void FrameDrawer::drawText() {
         std::stringstream s;
+        float percentInliers = (mnMatches == 0) ? 0.0f : 100.0f*mnInliers/mnMatches;
         s << "Matches: " << std::fixed << std::setprecision(0) << mnMatches << ", Inliers: "
-                << std::fixed << std::setprecision(2) << 100.0*mnInliers/mnMatches << "%";
-        mImgDisplay.rowRange(2*mszImgSize.height + 5, 2*mszImgSize.height + 25) = cv::Mat::zeros(20,mImgDisplay.cols,mImgDisplay.type());
-        cv::putText(mImgDisplay, s.str(), cv::Point(5,mImgDisplay.rows-5),cv::FONT_HERSHEY_PLAIN,1,cv::Scalar(255,255,255),1,8);
+                << std::fixed << std::setprecision(2) << percentInliers << "%";
+        mImgDisplay.rowRange(2*mHeight + 5, 2*mHeight + 25) = cv::Mat::zeros(20,mImgDisplay.cols,mImgDisplay.type());
+        cv::putText(mImgDisplay, s.str(), cv::Point(5,mImgDisplay.rows-5), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255,255,255), 1, 8);
     }
 
 } // namespace SFO

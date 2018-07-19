@@ -29,7 +29,7 @@ namespace SFO {
     class GtsamTracker {
     public:
 
-        GtsamTracker(const std::string &strSettingsFile, const oxts &navdata0);
+        GtsamTracker(const std::string &strSettingsFile, const oxts &navdata0, const libviso2::Matrix &imu_T_cam);
 
         ~GtsamTracker();
 

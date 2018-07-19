@@ -1,3 +1,6 @@
+#define _USE_MATH_DEFINES
+#include <math.h> // Can axess pi as M_PI
+
 #include <fstream>
 #include <iomanip> // setprecision
 
@@ -19,7 +22,7 @@
 #include "gtsamTracker.h"
 
 namespace SFO {
-    GtsamTracker::GtsamTracker(const std::string &strSettingsFile, const oxts &navdata0) {
+    GtsamTracker::GtsamTracker(const std::string &strSettingsFile, const oxts &navdata0, const libviso2::Matrix &imu_T_cam) {
         mProj.Reset(navdata0.lat, navdata0.lon, navdata0.alt);
 
         double x0, y0, z0;
@@ -29,24 +32,25 @@ namespace SFO {
 
         mPoseId = 0;
 
-        gtsam::Pose3 initialPoseEstimate; // Origin is default constructor
-        //gtsam::noiseModel::Diagonal::shared_ptr priorNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << gtsam::Vector3::Constant(0.3), gtsam::Vector3::Constant(0.1)).finished()); // 30cm std on x,y,z 0.1 rad on roll,pitch,yaw
+        gtsam::Pose3 initialPoseEstimate = cvtMatrix2Pose3(imu_T_cam);
+        mEstimate.insert(gtsam::Symbol('x', mPoseId), initialPoseEstimate);
+
+        //gtsam::noiseModel::Diagonal::shared_ptr priorTranslationNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(navdata0.pos_accuracy, navdata0.pos_accuracy, navdata0.pos_accuracy)); // 1 m in x, y and z
+        //mGraph.emplace_shared<gtsam::PoseTranslationPrior<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId), initialPoseEstimate, priorTranslationNoise); // No prior on rotation. Translation prior uses only translation part of pose
+
+        gtsam::noiseModel::Diagonal::shared_ptr priorPoseNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << gtsam::Vector3(M_PI/2, M_PI/2, 100), gtsam::Vector3(navdata0.pos_accuracy, navdata0.pos_accuracy, navdata0.pos_accuracy)).finished()); // Assuming pitch and roll is in [-pi/4, pi/4] and yaw is unknown
+        mGraph.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(gtsam::Symbol('x', mPoseId), initialPoseEstimate, priorPoseNoise);
+
+        mPoseId++;
 
         mOdometryNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << gtsam::Vector3::Constant(0.1), gtsam::Vector3::Constant(0.05)).finished()); // 10cm std on x,y,z 0.05 rad on roll,pitch,yaw
 
-        mEstimate.insert(gtsam::Symbol('x', mPoseId), initialPoseEstimate);
-        gtsam::noiseModel::Diagonal::shared_ptr priorTranslationNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(navdata0.pos_accuracy, navdata0.pos_accuracy, navdata0.pos_accuracy)); // 1 m in x, y and z
-        mGraph.emplace_shared<gtsam::PoseTranslationPrior<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId), initialPoseEstimate, priorTranslationNoise); // No prior on rotation. Translation prior uses only translation part of pose
-
-        /*
-        gtsam::noiseModel::Diagonal::shared_ptr priorRotationNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(3, 3, 3));
-        mGraph.emplace_shared<gtsam::PoseRotationPrior<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId), initialPoseEstimate, priorRotationNoise);
-         */
-        mPoseId++;
         //mGraph.emplace_shared<gtsam::NonlinearEquality<gtsam::Pose3> >(gtsam::Symbol('x',1), mStereoCamera.pose());
     }
 
-    GtsamTracker::~GtsamTracker() = default;
+    GtsamTracker::~GtsamTracker() {
+        std::cout << "GtsamTracker destructor called." << std::endl;
+    }
 
 
     void GtsamTracker::getMatchedPairs(const libviso2::Matcher::p_match &match,
@@ -70,6 +74,7 @@ namespace SFO {
                                                                               gtsam::Point3(x, y, z),
                                                                               priorTranslationNoise);
         }
+
 
         // TODO adjust noise based on outlier to inlier ratio (or something)
         gtsam::Pose3 pose3T_delta = cvtMatrix2Pose3(T_delta);
@@ -202,19 +207,6 @@ namespace SFO {
 
         gtsam::Pose3 Mout(R, t);
         return Mout;
-
-        /*
-        long m = Min.m;
-        long n = Min.n;
-        gtsam::Matrix Mout(Min.m, Min.n);
-        for (int i=0;i<m; i++){
-            for (int j=0;j<n;j++){
-                Mout(i,j) = Min.val[i][j];
-            }
-        }
-        return gtsam::Pose3(Mout);
-        */
-
     }
 
 
@@ -252,6 +244,7 @@ namespace SFO {
     }
 
     void GtsamTracker::save() {
+        std::cout << "Saving GPS track to file..." << std::endl;
         std::ofstream f;
         f.open("output.txt");
 

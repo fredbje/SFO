@@ -1,5 +1,4 @@
 #include<iostream>
-#include<iomanip>
 
 #include "libviso2/matrix.h"
 #include "libviso2/viso_stereo.h"
@@ -12,15 +11,15 @@
 #include "oxts.h"
 //#include "tracking.h"
 
-
 int main(int argc, char **argv){
-    std::string strSequenceDir = "/home/fbjerkaas/Master/Datasets/kitti-gray/sequences/00";
-    std::string strSettingsFile = "/home/fbjerkaas/Master/SFO/examples/KITTI00-02.yaml";
-    std::string strTimestampsFile = "/home/fbjerkaas/Master/Datasets/kitti-gray/sequences/00/times.txt";
-    std::string strGtPosesFile = "/home/fbjerkaas/Master/Datasets/kitti-poses/dataset/poses/00.txt";
-    std::string strOxtsDir = "/home/fbjerkaas/Master/Datasets/2011_10_03/2011_10_03_drive_0027_sync/oxts/data";
-    std::string strImu2VeloCalibFile = "/home/fbjerkaas/Master/Datasets/2011_10_03/2011_10_03/calib_imu_to_velo.txt";
-    std::string strVelo2CamCalibFile = "/home/fbjerkaas/Master/Datasets/2011_10_03/2011_10_03/calib_velo_to_cam.txt";
+    std::string strSequenceDir = "/home/fredbje/Datasets/kitti-gray/sequences/00";
+    std::string strSettingsFile = "/home/fredbje/git/SFO/examples/KITTI00-02.yaml";
+    std::string strTimestampsFile = "/home/fredbje/Datasets/kitti-gray/sequences/00/times.txt";
+    std::string strGtPosesFile = "/home/fredbje/Datasets/kitti-poses/dataset/poses/00.txt";
+    std::string strOxtsDir = "/home/fredbje/Datasets/2011_10_03/2011_10_03_drive_0027_sync/oxts/data";
+    std::string strImu2VeloCalibFile = "/home/fredbje/Datasets/2011_10_03/2011_10_03/calib_imu_to_velo.txt";
+    std::string strVelo2CamCalibFile = "/home/fredbje/Datasets/2011_10_03/2011_10_03/calib_velo_to_cam.txt";
+    std::string strVocabularyFile = "/home/fredbje/git/SFO/vocabulary/ORBvoc.txt";
 
     std::vector<std::string> vstrLeftImages;
     std::vector<std::string> vstrRightImages;
@@ -47,17 +46,17 @@ int main(int argc, char **argv){
         return 1;
     }
 
-    SFO::System SLAM(strSettingsFile, vOxtsData[0], vGtPoses);
+    SFO::System SLAM(strSettingsFile, strVocabularyFile, vOxtsData[0], imu_T_cam, vGtPoses);
     cv::Mat imgLeft;
     cv::Mat imgRight;
     //SFO::Tracking tracker(strSettingsFile);
-    for (std::size_t i = 0; i < 500/*vstrLeftImages.size()*/; i++) { // 4541 images
+    for (std::size_t i = 0; i < 10 /*vstrLeftImages.size()*/; i++) { // 4541 images
         loadImages(imgLeft, imgRight, vstrLeftImages[i], vstrRightImages[i]);
         //tracker.track(imgLeft, imgRight, 0);
         SLAM.trackStereo(imgLeft, imgRight, vTimestamps[i], vOxtsData[i]);
     }
 
-    //SLAM.shutdown();
+    SLAM.shutdown();
 
     std::cout << "SFO_main complete! Exiting ..." << std::endl;
 

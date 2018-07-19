@@ -6,7 +6,8 @@ namespace SFO {
     MapDrawer::MapDrawer(const std::string &strSettingsFile) {
         cv::FileStorage fSettings(strSettingsFile, cv::FileStorage::READ);
         if (!fSettings.isOpened()) {
-            std::cerr << "Failed to open settings file at: " << strSettingsFile << std::endl;
+            std::cerr << "Failed to open settings file at: " << strSettingsFile
+                      << " in MapDrawer constructor" << std::endl;
         }
         mViewpointX = fSettings["Viewer.ViewpointX"];
         mViewpointY = fSettings["Viewer.ViewpointY"];
@@ -18,12 +19,14 @@ namespace SFO {
     }
 
 
-    MapDrawer::MapDrawer(const std::string &strSettingsFile, const std::vector<libviso2::Matrix> &vGtPoses)
+    MapDrawer::MapDrawer(const std::string &strSettingsFile,
+                         const std::vector<libviso2::Matrix> &vGtPoses)
             : MapDrawer(strSettingsFile) {
         *mpvGtPoses = vGtPoses;
     }
 
     MapDrawer::~MapDrawer() {
+        std::cout << "MapDrawer destructor called." << std::endl;
         delete mpvPoses;
         delete mpvGtPoses;
     }
@@ -112,7 +115,7 @@ namespace SFO {
     }
 
     // TODO Make it possible to option out viewing different poses and graphs.
-    void MapDrawer::start() {
+    void MapDrawer::run() {
         pangolin::CreateWindowAndBind("Pose Viewer", 1024, 768);
         glEnable(GL_DEPTH_TEST);
 
@@ -214,7 +217,7 @@ namespace SFO {
         }
         pangolin::DestroyWindow("Pose Viewer");
         delete handler3D;
-        std::cout << "Deleted handler 3D" << std::endl;
+        std::cout << "Exiting MapDrawer thread." << std::endl;
     }
     
     void MapDrawer::drawLines(pangolin::OpenGlMatrix T1, pangolin::OpenGlMatrix T2, Color color) {

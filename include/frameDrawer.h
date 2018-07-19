@@ -10,29 +10,42 @@
 namespace SFO {
     class FrameDrawer {
     public:
-        FrameDrawer(libviso2::VisualOdometryStereo *pTracker, const cv::Size &szImgSize);
+        FrameDrawer(const std::string &strSettingsFile);
+        ~FrameDrawer();
 
-        void update(const cv::Mat &imgLeft, const cv::Mat &imgRight);
+        void update(const cv::Mat &imgLeft,
+                    const cv::Mat &imgRight,
+                    const std::vector<libviso2::Matcher::p_match> &vMatches,
+                    const std::vector<int32_t> &vInliers);
 
-        const cv::Mat drawFrame();
+        void run();
+
+        void requestFinish();
 
     private:
+        void drawFrame();
         void drawText();
 
-        cv::Size mszImgSize;
+        std::mutex mMutexFinish;
+        bool mbFinishRequested = false;
+        bool checkFinish();
+
+        int mWidth;
+        int mHeight;
 
         cv::Mat mImgDisplay;
         cv::Mat mImgDisplayUpper;
         cv::Mat mImgDisplayLower;
 
-        std::mutex mMutexUpdate;
+        // Display time for each image (1/fps)
+        float mT;
 
-        libviso2::VisualOdometryStereo *mpTracker;
+        std::mutex mMutex;
 
         std::vector<libviso2::Matcher::p_match> mvMatches;
         std::vector<int32_t> mvInliers;
-        int mnMatches;
-        int mnInliers;
+        size_t mnMatches;
+        size_t mnInliers;
 
     };
 } // namespace SFO

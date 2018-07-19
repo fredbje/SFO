@@ -1,53 +1,69 @@
 #include <thread>
 #include <opencv/cv.hpp>
 
-#include "libviso2/matrix.h"
-#include "libviso2/viso_stereo.h"
-
 #include "gtsamTracker.h"
 #include "mapDrawer.h"
 #include "frameDrawer.h"
 #include "system.h"
 
 namespace SFO {
-    System::System(const std::string &strSettingsFile, const oxts &navdata0) {
+    System::System(const std::string &strSettingsFile,
+                   const std::string &strVocabularyFile,
+                   const oxts &navdata0,
+                   const libviso2::Matrix &imu_T_cam) {
         mFrame = 0;
         loadSettings(strSettingsFile);
+        mpLoopDetector = new LoopDetector(strVocabularyFile, strSettingsFile);
         mpTracker = new libviso2::VisualOdometryStereo(mParam);
+        mpFrameDrawer = new FrameDrawer(strSettingsFile);
+        mtFrameDrawer = std::thread(&FrameDrawer::run, mpFrameDrawer);
+        mpGtsamTracker = new GtsamTracker(strSettingsFile, navdata0, imu_T_cam);
         mpMapDrawer = new MapDrawer(strSettingsFile);
-        mpFrameDrawer = new FrameDrawer(mpTracker, mImgSize);
-        mpGtsamTracker = new GtsamTracker(strSettingsFile, navdata0);
-        mtMapDrawer = std::thread(&MapDrawer::start, mpMapDrawer);
+        mtMapDrawer = std::thread(&MapDrawer::run, mpMapDrawer);
 
-        // Initialize trajectory to the origin
-        mPose = libviso2::Matrix::eye(4);
+        // Initialize trajectory to the origin of the IMU.
+        mPose = imu_T_cam;
         mpvPoses = new std::vector<libviso2::Matrix>();
-        mpvPoses->push_back(mPose);
+        mpvPoses->push_back(imu_T_cam);
         mpMapDrawer->updatePoses(mpvPoses);
     }
 
-    System::System(const std::string &strSettingsFile, const oxts &navdata0, const std::vector<libviso2::Matrix> &vGtPoses)
-            : System(strSettingsFile, navdata0) {
+    System::System(const std::string &strSettingsFile,
+                   const std::string &strVocabularyFile,
+                   const oxts &navdata0,
+                   const libviso2::Matrix &imu_T_cam,
+                   const std::vector<libviso2::Matrix> &vGtPoses)
+            : System(strSettingsFile, strVocabularyFile, navdata0, imu_T_cam) {
         mpMapDrawer->setGtPoses(vGtPoses);
     }
 
     System::~System() {
+        std::cout << "System destructor called." << std::endl;
         delete mpTracker;
         delete mpMapDrawer;
         delete mpFrameDrawer;
         delete mpvPoses;
+        delete mpLoopDetector;
     }
 
-    void System::trackStereo(const cv::Mat &imgLeft, const cv::Mat &imgRight, const double &timestamp, const oxts &navdata) {
+    void System::trackStereo(const cv::Mat &imgLeft,
+                             const cv::Mat &imgRight,
+                             const double &timestamp,
+                             const oxts &navdata) {
         std::cout << "Processing: Frame: " << std::setw(4) << mFrame;
         if(imgLeft.size() != mImgSize || imgRight.size() != mImgSize) {
             std::cerr << "Error, images have different size than specified in settings file." << std::endl;
         }
 
-        // process a new images, push the images back to an internal ring buffer.
+        DLoopDetector::DetectionResult result;
+        std::thread tLoopDetection(&LoopDetector::process, mpLoopDetector, imgLeft, std::ref(result));
+        // process new images, push the images back to an internal ring buffer.
         // valid motion estimates are available after calling process for two times.
         // output: returns false if an error occurred.
-        if (mpTracker->process(imgLeft.data, imgRight.data, mDims)) {
+        bool bTrackOK = mpTracker->process(imgLeft.data, imgRight.data, mDims);
+        tLoopDetection.join();
+
+        if (bTrackOK) {
             mvMatches.clear();
             mvInliers.clear();
             // returns previous to current feature matches from internal matcher
@@ -64,10 +80,9 @@ namespace SFO {
 
             mpMapDrawer->updatePoses(mpvPoses);
 
-            mpFrameDrawer->update(imgLeft, imgRight);
+            mpFrameDrawer->update(imgLeft, imgRight, mvMatches, mvInliers);
 
-            cv::imshow("Stereo Gray Image", mpFrameDrawer->drawFrame());
-            cv::waitKey(static_cast<int>(mT*1e3));
+
         } else if(mFrame != 0) { // mpTracker->process needs two frames to provide valid motion estimates
             std::cerr << " ... failed!";
         }
@@ -105,8 +120,11 @@ namespace SFO {
     }
 
     void System::shutdown() {
+        std::cout << "Shutting down..." << std::endl;
         mpMapDrawer->requestFinish();
+        mpFrameDrawer->requestFinish();
         mpGtsamTracker->save();
         mtMapDrawer.join();
+        mtFrameDrawer.join();
     }
 } // namespace SFO

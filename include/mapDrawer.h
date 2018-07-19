@@ -30,7 +30,7 @@ namespace SFO {
 
         void updatePoses(std::vector<libviso2::Matrix> *pvPoses);
 
-        void start();
+        void run();
 
         void requestFinish();
 
@@ -54,13 +54,7 @@ namespace SFO {
 
         double mViewpointX, mViewpointY, mViewpointZ, mViewpointF;
 
-
-
-
-
     };
-
-}
-
+} //namespace SFO
 
 #endif //SFO_DRAWER_H
