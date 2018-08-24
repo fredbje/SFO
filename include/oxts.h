@@ -26,7 +26,7 @@ struct oxts { // oxts is the brand of the INS used in the KITTI dataset
     wf:            angular rate around forward axis (rad/s)
     wl:            angular rate around leftward axis (rad/s)
     wu:            angular rate around upward axis (rad/s)
-    pos_accuracy:  velocity accuracy (north/east in m)
+    pos_accuracy:  position accuracy (north/east in m)
     vel_accuracy:  velocity accuracy (north/east in m/s)
     navstat:       navigation status (see navstat_to_string)
     numsats:       number of satellites tracked by primary GPS receiver

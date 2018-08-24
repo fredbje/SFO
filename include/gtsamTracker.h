@@ -60,8 +60,12 @@ namespace SFO {
 
 
 
-        gtsam::NonlinearFactorGraph mGraph;
-        gtsam::Values mEstimate;
+        gtsam::NonlinearFactorGraph mNewFactors;
+        gtsam::Values mNewValues;
+        gtsam::Values mCurrentEstimate;
+
+        gtsam::ISAM2Params mParameters;
+        gtsam::ISAM2 mIsam;
 
         //GeographicLib::Geocentric earth(GeographicLib::Constants::WGS84_a(), GeographicLib::Constants::WGS84_f());
         GeographicLib::LocalCartesian mProj;

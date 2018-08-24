@@ -50,7 +50,7 @@ int main(int argc, char **argv){
     cv::Mat imgLeft;
     cv::Mat imgRight;
     //SFO::Tracking tracker(strSettingsFile);
-    for (std::size_t i = 0; i < 10 /*vstrLeftImages.size()*/; i++) { // 4541 images
+    for (std::size_t i = 0; i < vstrLeftImages.size(); i++) { // 4541 images
         loadImages(imgLeft, imgRight, vstrLeftImages[i], vstrRightImages[i]);
         //tracker.track(imgLeft, imgRight, 0);
         SLAM.trackStereo(imgLeft, imgRight, vTimestamps[i], vOxtsData[i]);
