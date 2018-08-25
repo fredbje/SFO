@@ -13,10 +13,13 @@ namespace SFO {
         FrameDrawer(const std::string &strSettingsFile);
         ~FrameDrawer();
 
-        void update(const cv::Mat &imgLeft,
+        void update(const unsigned int &nFrame,
+                    const cv::Mat &imgLeft,
                     const cv::Mat &imgRight,
                     const std::vector<libviso2::Matcher::p_match> &vMatches,
-                    const std::vector<int32_t> &vInliers);
+                    const std::vector<int32_t> &vInliers,
+                    const bool &bLoopDetected,
+                    const unsigned int &nLoopMatch);
 
         void run();
 
@@ -46,6 +49,10 @@ namespace SFO {
         std::vector<int32_t> mvInliers;
         size_t mnMatches;
         size_t mnInliers;
+        bool mbLoopDetected;
+        unsigned int mnLoopMatch;
+        unsigned int mnLoops;
+        unsigned int mnFrame;
 
     };
 } // namespace SFO

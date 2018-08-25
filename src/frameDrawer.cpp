@@ -3,6 +3,7 @@
 #include <iomanip> // setprecision
 #include <opencv/cv.hpp> // imshow
 
+
 namespace SFO {
     FrameDrawer::FrameDrawer(const std::string &strSettingsFile) {
         cv::FileStorage fSettings(strSettingsFile, cv::FileStorage::READ);
@@ -20,23 +21,33 @@ namespace SFO {
         mImgDisplay = cv::Mat(2*mHeight + borderHeight + textHeight, mWidth, CV_8UC3);
         mImgDisplayUpper = cv::Mat(mImgDisplay, cv::Rect(0, 0, mWidth, mHeight));
         mImgDisplayLower = cv::Mat(mImgDisplay, cv::Rect(0, mHeight + borderHeight, mWidth, mHeight));
+
+        mnFrame = 0;
+        mnLoops = 0;
+        mbLoopDetected = false;
     }
 
     FrameDrawer::~FrameDrawer() {
         std::cout << "FrameDrawer destructor called." << std::endl;
     }
 
-    void FrameDrawer::update(const cv::Mat &imgLeft,
+    void FrameDrawer::update(const unsigned int &nFrame,
+                             const cv::Mat &imgLeft,
                              const cv::Mat &imgRight,
                              const std::vector<libviso2::Matcher::p_match> &vMatches,
-                             const std::vector<int32_t> &vInliers) {
+                             const std::vector<int32_t> &vInliers,
+                             const bool &bLoopDetected,
+                             const unsigned int &nLoopMatch) {
         std::unique_lock<std::mutex> lock(mMutex);
+        mnFrame = nFrame;
         cv::cvtColor(imgLeft, mImgDisplayUpper, CV_GRAY2RGB);
         cv::cvtColor(imgRight, mImgDisplayLower, CV_GRAY2RGB);
         mvMatches = vMatches;
         mvInliers = vInliers;
         mnMatches = vMatches.size();
         mnInliers = vInliers.size();
+        mbLoopDetected = bLoopDetected;
+        mnLoopMatch = nLoopMatch;
     }
 
     void FrameDrawer::run() {
@@ -81,12 +92,26 @@ namespace SFO {
     }
 
     void FrameDrawer::drawText() {
-        std::stringstream s;
+        std::stringstream ss;
+
+
         float percentInliers = (mnMatches == 0) ? 0.0f : 100.0f*mnInliers/mnMatches;
-        s << "Matches: " << std::fixed << std::setprecision(0) << mnMatches << ", Inliers: "
+        ss << "Frame: " << mnFrame << ", Feature Matches: " << std::fixed << std::setprecision(0) << mnMatches << ", Inliers: "
                 << std::fixed << std::setprecision(2) << percentInliers << "%";
+
+
+        if(mbLoopDetected) {
+            ss << ", Loop match " << mnLoopMatch;
+            ++mnLoops;
+        } else {
+            ss << ", No loop match";
+        }
+
+        ss << ", Loops in sequence: " << mnLoops;
+
         mImgDisplay.rowRange(2*mHeight + 5, 2*mHeight + 25) = cv::Mat::zeros(20,mImgDisplay.cols,mImgDisplay.type());
-        cv::putText(mImgDisplay, s.str(), cv::Point(5,mImgDisplay.rows-5), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255,255,255), 1, 8);
+        cv::putText(mImgDisplay, ss.str(), cv::Point(5,mImgDisplay.rows-5), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255,255,255), 1, 8);
     }
 
 } // namespace SFO
+

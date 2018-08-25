@@ -17,7 +17,7 @@
 #include <gtsam/slam/PoseTranslationPrior.h>
 #include <gtsam/slam/PoseRotationPrior.h>
 #include <gtsam/slam/BetweenFactor.h>
-#include <gtsam_unstable/slam/SmartStereoProjectionPoseFactor.h>
+#include <gtsam/slam/SmartProjectionPoseFactor.h>
 
 #include "vertigo/betweenFactorSwitchable.h"
 #include "vertigo/switchVariableLinear.h"
@@ -78,22 +78,37 @@ namespace SFO {
     void GtsamTracker::update(const libviso2::Matrix &T_delta, const std::vector<libviso2::Matcher::p_match> &vMatches,
                               const std::vector<int32_t> &vInliers, const oxts &navdata) {
 
+        gtsam::Pose3 pose3T_delta = cvtMatrix2Pose3(T_delta);
+        gtsam::Pose3 lastPose;
+        lastPose = mIsam.calculateEstimate<gtsam::Pose3>(gtsam::Symbol('x', mPoseId-1));
+        mNewValues.insert(gtsam::Symbol('x', mPoseId), lastPose * pose3T_delta);
+
 /*
         const gtsam::noiseModel::Isotropic::shared_ptr imageNoiseModel = gtsam::noiseModel::Isotropic::Sigma(3, 1); // 1 pixel in ul, ur, v
-        gtsam::Pose3 pose3T_delta = cvtMatrix2Pose3(T_delta);
-
-        gtsam::SmartStereoProjectionPoseFactor::shared_ptr factor(new gtsam::SmartStereoProjectionPoseFactor(imageNoiseModel));
+        gtsam::SmartStereoProjectionPoseFactor::shared_ptr smartFactor(new gtsam::SmartStereoProjectionPoseFactor(imageNoiseModel));
         gtsam::StereoPoint2 spt1, spt2;
         for(size_t kk = 0; kk < vInliers.size(); kk++) {
             getMatchedPairs(vMatches[vInliers[kk]], spt1, spt2);
-            mGraph.push_back(factor);
-            factor = gtsam::SmartStereoProjectionPoseFactor::shared_ptr(new gtsam::SmartStereoProjectionPoseFactor(imageNoiseModel));
-            factor->add(spt1, gtsam::Symbol('x', mPoseId-1), mK);
-            factor->add(spt2, gtsam::Symbol('x', mPoseId), mK);
+            mNewFactors.push_back(smartFactor);
+            smartFactor = gtsam::SmartStereoProjectionPoseFactor::shared_ptr(new gtsam::SmartStereoProjectionPoseFactor(imageNoiseModel));
+            smartFactor->add(spt1, gtsam::Symbol('x', mPoseId-1), mK);
+            smartFactor->add(spt2, gtsam::Symbol('x', mPoseId), mK);
         }
-
 */
 
+/*
+        const gtsam::noiseModel::Isotropic::shared_ptr imageNoiseModel = gtsam::noiseModel::Isotropic::Sigma(2, 1.0);
+        gtsam::Point2 pt1, pt2;
+        for(size_t kk = 0; kk < vInliers.size(); kk++) {
+            const libviso2::Matcher::p_match match = vMatches[vInliers[kk]];
+            pt1 = gtsam::Point2(match.u1p, match.v1p);
+            pt2 = gtsam::Point2(match.u1c, match.v1c);
+            gtsam::SmartProjectionPoseFactor<gtsam::Cal3_S2>::shared_ptr smartFactor(new gtsam::SmartProjectionPoseFactor<gtsam::Cal3_S2>(imageNoiseModel, mK1));
+            smartFactor->add(pt1, gtsam::Symbol('x', mPoseId-1));
+            smartFactor->add(pt2, gtsam::Symbol('x', mPoseId));
+            mNewFactors.push_back(smartFactor);
+        }
+*/
 
         if((mPoseId % 100) == 0) {
             double x, y, z;
@@ -105,15 +120,12 @@ namespace SFO {
                                                                               priorTranslationNoise);
         }
 
-        gtsam::Pose3 pose3T_delta = cvtMatrix2Pose3(T_delta);
+
         mNewFactors.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3> >(gtsam::Symbol('x', mPoseId-1), gtsam::Symbol('x', mPoseId), pose3T_delta, mOdometryNoise);
         //mStereoCamera = gtsam::StereoCamera(gtsamPose, mK);
-        gtsam::Pose3 lastPose;
 
-        lastPose = mIsam.calculateEstimate<gtsam::Pose3>(gtsam::Symbol('x', mPoseId-1));
 
-        mNewValues.insert(gtsam::Symbol('x', mPoseId++), lastPose * pose3T_delta);
-
+        mPoseId++;
         /*
         gtsam::StereoPoint2 spt1, spt2;
         for(size_t kk=0; kk<vInliers.size()-1; kk++) {

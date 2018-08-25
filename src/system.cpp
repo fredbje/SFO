@@ -11,7 +11,7 @@ namespace SFO {
                    const std::string &strVocabularyFile,
                    const oxts &navdata0,
                    const libviso2::Matrix &imu_T_cam) {
-        mFrame = 0;
+        mnFrame = 0;
         loadSettings(strSettingsFile);
         mpLoopDetector = new LoopDetector(strVocabularyFile, strSettingsFile);
         mpTracker = new libviso2::VisualOdometryStereo(mParam);
@@ -50,13 +50,12 @@ namespace SFO {
                              const cv::Mat &imgRight,
                              const double &timestamp,
                              const oxts &navdata) {
-        std::cout << "Processing: Frame: " << std::setw(4) << mFrame;
         if(imgLeft.size() != mImgSize || imgRight.size() != mImgSize) {
             std::cerr << "Error, images have different size than specified in settings file." << std::endl;
         }
 
-        DLoopDetector::DetectionResult result;
-        std::thread tLoopDetection(&LoopDetector::process, mpLoopDetector, imgLeft, std::ref(result));
+        DLoopDetector::DetectionResult loopResult;
+        std::thread tLoopDetection(&LoopDetector::process, mpLoopDetector, imgLeft, std::ref(loopResult));
         // process new images, push the images back to an internal ring buffer.
         // valid motion estimates are available after calling process for two times.
         // output: returns false if an error occurred.
@@ -80,14 +79,14 @@ namespace SFO {
 
             mpMapDrawer->updatePoses(mpvPoses);
 
-            mpFrameDrawer->update(imgLeft, imgRight, mvMatches, mvInliers);
+            mpFrameDrawer->update(mnFrame, imgLeft, imgRight, mvMatches, mvInliers, loopResult.detection(), loopResult.match);
 
 
-        } else if(mFrame != 0) { // mpTracker->process needs two frames to provide valid motion estimates
+        } else if(mnFrame != 0) { // mpTracker->process needs two frames to provide valid motion estimates
             std::cerr << " ... failed!";
         }
         std::cout << std::endl;
-        mFrame++;
+        mnFrame++;
     }
 
     void System::loadSettings(const std::string &strSettingsFile) {

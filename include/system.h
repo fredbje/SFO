@@ -28,11 +28,11 @@ namespace SFO {
 
         cv::Size mImgSize;
 
-        int mFrame;
+        unsigned int mnFrame;
 
         libviso2::Matrix mPose;
 
-        std::vector<libviso2::Matrix> *mpvPoses;;
+        std::vector<libviso2::Matrix> *mpvPoses;
 
         std::vector<int32_t> mvInliers;
         std::vector<libviso2::Matcher::p_match> mvMatches;

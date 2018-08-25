@@ -86,68 +86,71 @@ LoopDetector::~LoopDetector(){
 
 void LoopDetector::process(const cv::Mat &im, DLoopDetector::DetectionResult &result) {
     // prepare profiler to measure times
-    DUtils::Profiler profiler;
+    //DUtils::Profiler profiler;
 
     // get features
-    profiler.profile("features");
+    //profiler.profile("features");
     mpExtractor->operator()(im, mvKeys, mvDescriptors);
-    profiler.stop();
+    //profiler.stop();
 
-    profiler.profile("detection");
+    //profiler.profile("detection");
     mpDetector->detectLoop(mvKeys, mvDescriptors, result);
-    profiler.stop();
+    //profiler.stop();
 
-    int match = -1;
-    if(result.detection())
-    {
-        match = result.match;
-        std::cout << "- Loop found with image " << match << "!"
-             << std::endl;
-        ++mCount;
-    }
-    else
-    {
-        cout << "- No loop: ";
-        switch(result.status)
-        {
-            case DLoopDetector::CLOSE_MATCHES_ONLY:
-                std::cout << "All the images in the database are very recent" << std::endl;
-                break;
+/*
+       int match = -1;
+       if(result.detection())
+       {
+           match = result.match;
+           std::cout << "- Loop found with image " << match << "!"
+                << std::endl;
+           ++mCount;
+       }
 
-            case DLoopDetector::NO_DB_RESULTS:
-                std::cout << "There are no matches against the database (few features in"
-                        " the image?)" << std::endl;
-                break;
+       else
+       {
+           cout << "- No loop: ";
+           switch(result.status)
+           {
+               case DLoopDetector::CLOSE_MATCHES_ONLY:
+                   std::cout << "All the images in the database are very recent" << std::endl;
+                   break;
 
-            case DLoopDetector::LOW_NSS_FACTOR:
-                std::cout << "Little overlap between this image and the previous one"
-                     << std::endl;
-                break;
+               case DLoopDetector::NO_DB_RESULTS:
+                   std::cout << "There are no matches against the database (few features in"
+                           " the image?)" << std::endl;
+                   break;
 
-            case DLoopDetector::LOW_SCORES:
-                std::cout << "No match reaches the score threshold (alpha: " <<
-                     mpParams->alpha << ")" << std::endl;
-                break;
+               case DLoopDetector::LOW_NSS_FACTOR:
+                   std::cout << "Little overlap between this image and the previous one"
+                        << std::endl;
+                   break;
 
-            case DLoopDetector::NO_GROUPS:
-                std::cout << "Not enough close matches to create groups. "
-                     << "Best candidate: " << result.match << std::endl;
-                break;
+               case DLoopDetector::LOW_SCORES:
+                   std::cout << "No match reaches the score threshold (alpha: " <<
+                        mpParams->alpha << ")" << std::endl;
+                   break;
 
-            case DLoopDetector::NO_TEMPORAL_CONSISTENCY:
-                std::cout << "No temporal consistency (k: " << mpParams->k << "). "
-                     << "Best candidate: " << result.match << std::endl;
-                break;
+               case DLoopDetector::NO_GROUPS:
+                   std::cout << "Not enough close matches to create groups. "
+                        << "Best candidate: " << result.match << std::endl;
+                   break;
 
-            case DLoopDetector::NO_GEOMETRICAL_CONSISTENCY:
-                std::cout << "No geometrical consistency. Best candidate: "
-                     << result.match << std::endl;
-                break;
+               case DLoopDetector::NO_TEMPORAL_CONSISTENCY:
+                   std::cout << "No temporal consistency (k: " << mpParams->k << "). "
+                        << "Best candidate: " << result.match << std::endl;
+                   break;
 
-            default:
-                break;
-        }
-    }
+               case DLoopDetector::NO_GEOMETRICAL_CONSISTENCY:
+                   std::cout << "No geometrical consistency. Best candidate: "
+                        << result.match << std::endl;
+                   break;
+
+               default:
+                   break;
+           }
+       }
+
 
     std::cout << std::endl;
 
@@ -157,11 +160,13 @@ void LoopDetector::process(const cv::Mat &im, DLoopDetector::DetectionResult &re
         std::cout << mCount << " loops found in this image sequence!" << std::endl;
     }
 
+
     std::cout << std::endl << "Execution time:" << std::endl
               << " - Feature computation: " << profiler.getMeanTime("features") * 1e3
               << " ms/image" << std::endl
               << " - Loop detection: " << profiler.getMeanTime("detection") * 1e3
               << " ms/image" << std::endl;
+*/
 }
 
 // ---------------------------------------------------------------------------
