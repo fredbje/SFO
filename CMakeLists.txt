@@ -36,7 +36,8 @@ set(CMAKE_BUILD_TYPE Debug)
 #find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED)
 find_package(GTSAM REQUIRED)
-find_package(OpenCV 3 REQUIRED core imgcodecs videoio ximgproc features2d xfeatures2d)
+find_package(GTSAM_UNSTABLE REQUIRED)
+find_package(OpenCV 3 REQUIRED core imgcodecs videoio ximgproc features2d xfeatures2d calib3d)
 find_package(GeographicLib 1.34 REQUIRED)
 find_package(Pangolin REQUIRED)
 
@@ -47,6 +48,7 @@ include_directories(
         thirdparty
         ${EIGEN3_INCLUDE_DIR}
         ${GTSAM_INCLUDE_DIR}
+        ${GTSAM_UNSTABLE_INCLUDE_DIR}
         ${Boost_INCLUDE_DIRS} # For Boost::Filesystem
 	    ${OpenCV_INCLUDE_DIRS}
         ${GeographicLib_INCLUDE_DIRS}
@@ -89,6 +91,7 @@ target_link_libraries(kitti-stereo
         ${Pangolin_LIBRARY}
         gtsam
         ${GTSAM_LIBS}
+        ${GTSAM_UNSTABLE_LIBS}
         ${Boost_LIBRARIES}
         ${OpenCV_LIBRARIES}
         ${GeographicLib_LIBRARIES}
