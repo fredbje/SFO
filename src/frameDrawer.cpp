@@ -47,6 +47,9 @@ namespace SFO {
         mnMatches = vMatches.size();
         mnInliers = vInliers.size();
         mbLoopDetected = bLoopDetected;
+        if(bLoopDetected) {
+            mnLoops++;
+        }
         mnLoopMatch = nLoopMatch;
     }
 
@@ -101,8 +104,7 @@ namespace SFO {
 
 
         if(mbLoopDetected) {
-            ss << ", Loop match " << mnLoopMatch;
-            ++mnLoops;
+            ss << ", Loop match with frame: " << mnLoopMatch;
         } else {
             ss << ", No loop match";
         }

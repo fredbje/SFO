@@ -27,10 +27,6 @@ public:
     void loadDatabase(const std::string &strDatabaseFile);
 
 protected:
-    int m_width;
-    int m_height;
-    unsigned int mCount;
-
     OrbLoopDetector::Parameters *mpParams;
 
     OrbVocabulary *mpVoc;

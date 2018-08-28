@@ -1,9 +1,8 @@
-//
-// Created by lindeyang on 11/30/16.
-//
+#ifndef SFO_GTSAMTRACKER_H
+#define SFO_GTSAMTRACKER_H
 
-#ifndef SFO_STEREO_H
-#define SFO_STEREO_H
+#include <iostream>
+
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Point3.h>
 #include <gtsam/geometry/StereoPoint2.h>
@@ -19,11 +18,13 @@
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
-#include <iostream>
+
 #include <libviso2/matcher.h>
 #include <libviso2/viso_stereo.h>
 #include "libviso2/matrix.h"
+
 #include "oxts.h"
+#include "loopDetector.h"
 
 namespace SFO {
     class GtsamTracker {
@@ -34,12 +35,18 @@ namespace SFO {
         ~GtsamTracker();
 
         gtsam::Pose3 cvtMatrix2Pose3(const libviso2::Matrix &Min);
+        gtsam::Rot3 cvtMatrix2Rot3(const cv::Mat &Rin);
+        gtsam::Point3 cvtMatrix2Point3(const cv::Mat &tin);
         libviso2::Matrix cvtPose32Matrix(const gtsam::Pose3 &Min);
         void cvtMatrix2RT(const libviso2::Matrix &Min, gtsam::Rot3 &R, gtsam::Point3 &T);
         void cvtgtPose2RT(const gtsam::Pose3 &pose, libviso2::Matrix &ptrM);
 
-        void update(const libviso2::Matrix &T_delta, const std::vector<libviso2::Matcher::p_match> &vMatches,
-                    const std::vector<int32_t> &vInliers, const oxts &navdata);
+        void update(const libviso2::Matrix &T_delta,
+                    const std::vector<libviso2::Matcher::p_match> &vMatches,
+                    const std::vector<int32_t> &vInliers,
+                    const oxts &navdata,
+                    const DLoopDetector::DetectionResult &loopResult);
+
         std::vector<libviso2::Matrix> optimize();
 
         // From the matched feature pair to previous and current sterepoints
@@ -58,8 +65,6 @@ namespace SFO {
         gtsam::noiseModel::Diagonal::shared_ptr mOdometryNoise;
         gtsam::StereoCamera mStereoCamera;
 
-
-
         gtsam::NonlinearFactorGraph mNewFactors;
         gtsam::Values mNewValues;
         gtsam::Values mCurrentEstimate;
@@ -67,8 +72,10 @@ namespace SFO {
         gtsam::ISAM2Params mParameters;
         gtsam::ISAM2 mIsam;
 
+        DLoopDetector::DetectionResult mLoopResult;
+
         //GeographicLib::Geocentric earth(GeographicLib::Constants::WGS84_a(), GeographicLib::Constants::WGS84_f());
         GeographicLib::LocalCartesian mProj;
     };
 }
-#endif //SFO_STEREO_H
+#endif //SFO_GTSAMTRACKER_H

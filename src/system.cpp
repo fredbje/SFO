@@ -62,6 +62,7 @@ namespace SFO {
         bool bTrackOK = mpTracker->process(imgLeft.data, imgRight.data, mDims);
         tLoopDetection.join();
 
+
         if (bTrackOK) {
             mvMatches.clear();
             mvInliers.clear();
@@ -71,7 +72,7 @@ namespace SFO {
 
             // inv(getMotion()) returns {t-1}^T_{t}. Right multiply with last pose to get {0}^T_{t}
             libviso2::Matrix T_delta = libviso2::Matrix::inv(mpTracker->getMotion());
-            mpGtsamTracker->update(T_delta, mvMatches, mvInliers, navdata);
+            mpGtsamTracker->update(T_delta, mvMatches, mvInliers, navdata, loopResult);
             *mpvPoses = mpGtsamTracker->optimize();
 
             //mPose = mPose * T_delta;
@@ -83,9 +84,8 @@ namespace SFO {
 
 
         } else if(mnFrame != 0) { // mpTracker->process needs two frames to provide valid motion estimates
-            std::cerr << " ... failed!";
+            std::cerr << " ... failed!" << std::endl;
         }
-        std::cout << std::endl;
         mnFrame++;
     }
 

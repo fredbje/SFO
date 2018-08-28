@@ -5,6 +5,7 @@
 
 #include <gtsam/nonlinear/Marginals.h>
 #include <opencv2/core/persistence.hpp>
+#include <opencv2/calib3d/calib3d.hpp> // For findEssentialMat
 
 #include <gtsam/inference/Symbol.h>
 #include <gtsam/nonlinear/NonlinearEquality.h>
@@ -18,6 +19,8 @@
 #include <gtsam/slam/PoseRotationPrior.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/SmartProjectionPoseFactor.h>
+
+#include <gtsam_unstable/geometry/Similarity3.h>
 
 #include "vertigo/betweenFactorSwitchable.h"
 #include "vertigo/switchVariableLinear.h"
@@ -75,13 +78,52 @@ namespace SFO {
         spt2 = gtsam::StereoPoint2(match.u1c, match.u2c, match.v1c);
     }
 
-    void GtsamTracker::update(const libviso2::Matrix &T_delta, const std::vector<libviso2::Matcher::p_match> &vMatches,
-                              const std::vector<int32_t> &vInliers, const oxts &navdata) {
+    void GtsamTracker::update(const libviso2::Matrix &T_delta,
+                              const std::vector<libviso2::Matcher::p_match> &vMatches,
+                              const std::vector<int32_t> &vInliers,
+                              const oxts &navdata,
+                              const DLoopDetector::DetectionResult &loopResult) {
+
 
         gtsam::Pose3 pose3T_delta = cvtMatrix2Pose3(T_delta);
         gtsam::Pose3 lastPose;
         lastPose = mIsam.calculateEstimate<gtsam::Pose3>(gtsam::Symbol('x', mPoseId-1));
         mNewValues.insert(gtsam::Symbol('x', mPoseId), lastPose * pose3T_delta);
+
+        // If loop, add smart factors between matched frames
+        if(loopResult.detection()) {
+            cv::Mat E = cv::findEssentialMat(loopResult.queryFeatures, loopResult.matchFeatures, mK1->fx(), cv::Point2d(mK1->px(), mK1->py()));
+            cv::Mat Rtmp, ttmp;
+            recoverPose(E, loopResult.queryFeatures, loopResult.matchFeatures, Rtmp, ttmp, mK1->fx(), cv::Point2d(mK1->px(), mK1->py()));
+            gtsam::Rot3 R = cvtMatrix2Rot3(Rtmp);
+            gtsam::Point3 t = cvtMatrix2Point3(ttmp);
+            gtsam::Pose3 T = gtsam::Pose3(R, t);
+            gtsam::noiseModel::Diagonal::shared_ptr loopNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << gtsam::Vector3::Constant(0.2), gtsam::Vector3(5, 1, 1)).finished());
+            mNewFactors.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3>>(gtsam::Symbol('x', loopResult.query), gtsam::Symbol('x', loopResult.match), T, loopNoise);
+            //gtsam::Similarity3 simT = gtsam::Similarity3(R, t, 1.0);
+            //gtsam::noiseModel::Diagonal::shared_ptr simNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(7) << gtsam::Vector6::Constant(0.1), 10).finished()); // 10cm std on x,y,z 0.05 rad on roll,pitch,yaw
+            //mNewFactors.emplace_shared<gtsam::BetweenFactor<gtsam::Similarity3> >(gtsam::Symbol('x', loopResult.query), gtsam::Symbol('x', loopResult.match), simT, simNoise);
+            /*
+            const gtsam::noiseModel::Isotropic::shared_ptr imageNoiseModel = gtsam::noiseModel::Isotropic::Sigma(2, 1.0);
+            gtsam::Point2 pt1, pt2;
+            for(size_t kk = 0; kk < loopResult.inliers.size(); kk++) {
+
+
+
+
+                if(static_cast<unsigned>(loopResult.inliers[kk] == 0)) {
+                    continue;
+                }
+                pt1 = gtsam::Point2(loopResult.matchFeatures.at<float>(kk, 0), loopResult.matchFeatures.at<float>(kk, 1));
+                pt2 = gtsam::Point2(loopResult.queryFeatures.at<float>(kk, 0), loopResult.queryFeatures.at<float>(kk, 1));
+                gtsam::SmartProjectionPoseFactor<gtsam::Cal3_S2>::shared_ptr smartFactor(new gtsam::SmartProjectionPoseFactor<gtsam::Cal3_S2>(imageNoiseModel, mK1));
+                smartFactor->add(pt1, gtsam::Symbol('x', loopResult.match));
+                smartFactor->add(pt2, gtsam::Symbol('x', loopResult.query));
+                mNewFactors.push_back(smartFactor);
+
+            }
+                 */
+        }
 
 /*
         const gtsam::noiseModel::Isotropic::shared_ptr imageNoiseModel = gtsam::noiseModel::Isotropic::Sigma(3, 1); // 1 pixel in ul, ur, v
@@ -203,21 +245,62 @@ namespace SFO {
     }
 
 
-    gtsam::Pose3 GtsamTracker::cvtMatrix2Pose3(const libviso2::Matrix &Min) {
-        auto R = gtsam::Rot3(Min.val[0][0], Min.val[0][1],Min.val[0][2],
-                        Min.val[1][0], Min.val[1][1],Min.val[1][2],
-                        Min.val[2][0], Min.val[2][1],Min.val[2][2]);
-        auto t = gtsam::Point3(Min.val[0][3], Min.val[1][3], Min.val[2][3]);
+    gtsam::Pose3 GtsamTracker::cvtMatrix2Pose3(const libviso2::Matrix &Tin) {
+        auto R = gtsam::Rot3(Tin.val[0][0], Tin.val[0][1], Tin.val[0][2],
+                        Tin.val[1][0], Tin.val[1][1], Tin.val[1][2],
+                        Tin.val[2][0], Tin.val[2][1], Tin.val[2][2]);
+        auto t = gtsam::Point3(Tin.val[0][3], Tin.val[1][3], Tin.val[2][3]);
 
-        gtsam::Pose3 Mout(R, t);
-        return Mout;
+        gtsam::Pose3 Tout(R, t);
+        return Tout;
     }
 
+    gtsam::Rot3 GtsamTracker::cvtMatrix2Rot3(const cv::Mat &Rin) {
+        if(Rin.rows != 3 || Rin.cols != 3) {
+            std::cerr << "Error! Rotation matrix must be 3x3" << std::endl;
+            return gtsam::Rot3();
+        }
+        auto Rout = gtsam::Rot3(Rin.at<double>(0, 0), Rin.at<double>(0, 1), Rin.at<double>(0, 2),
+                                Rin.at<double>(1, 0), Rin.at<double>(1, 1), Rin.at<double>(1, 2),
+                                Rin.at<double>(2, 0), Rin.at<double>(2, 1), Rin.at<double>(2, 2));
+        return Rout;
+    }
+
+    gtsam::Point3 GtsamTracker::cvtMatrix2Point3(const cv::Mat &tin) {
+        if(tin.rows >= tin.cols) {
+            if(tin.rows != 3 || tin.cols != 1) {
+                std::cerr << "Error! Translation vector must be 3x1 or 1x3" << std::endl;
+                return gtsam::Point3();
+            }
+            auto tout = gtsam::Point3(tin.at<double>(0, 0), tin.at<double>(1, 0), tin.at<double>(2, 0));
+            return tout;
+        } else {
+            if(tin.rows != 1 || tin.cols != 3) {
+                std::cerr << "Error! Translation vector must be 3x1 or 1x3" << std::endl;
+                return gtsam::Point3();
+            }
+            auto tout = gtsam::Point3(tin.at<double>(0, 0), tin.at<double>(0, 1), tin.at<double>(0, 2));
+            return tout;
+        }
+    }
+
+    /*
+    gtsam::Rot3 GtsamTracker::cvtMatrix2Rot3(const libviso2::Matrix &Rin) {
+        auto Rout = gtsam::Rot3(Rin.val[0][0], Rin.val[0][1], Rin.val[0][2],
+                             Rin.val[1][0], Rin.val[1][1], Rin.val[1][2],
+                             Rin.val[2][0], Rin.val[2][1], Rin.val[2][2]);
+        return Rout;
+    }
+
+    gtsam::Point3 GtsamTracker::cvtMatrix2Point3(const libviso2::Matrix &tin) {
+        auto tout = gtsam::Point3(tin.val[0][0], tin.val[1][0], tin.val[2][0]);
+    }
+    */
 
     libviso2::Matrix GtsamTracker::cvtPose32Matrix(const gtsam::Pose3 &Min) {
         libviso2::Matrix Mout(4, 4);
-        for (int i=0;i<Min.matrix().rows(); i++){
-            for (int j=0;j<Min.matrix().cols();j++){
+        for (int i = 0; i < Min.matrix().rows(); i++){
+            for (int j = 0; j < Min.matrix().cols(); j++){
                 Mout.val[i][j] = Min.matrix()(i, j);
             }
         }
