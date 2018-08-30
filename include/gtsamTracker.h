@@ -56,7 +56,7 @@ namespace SFO {
 
         void save();
     private:
-        size_t mPoseId, mLandmarkId;
+        size_t mPoseId, mLandmarkId, mSwitchId;
         void loadCameraMatrix(const std::string &strSettingsFile);
 
         gtsam::Cal3_S2Stereo::shared_ptr mK;

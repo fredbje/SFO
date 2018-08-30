@@ -19,6 +19,8 @@
 #include <gtsam/slam/PoseRotationPrior.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/SmartProjectionPoseFactor.h>
+#include <gtsam/geometry/EssentialMatrix.h>
+#include <gtsam/slam/EssentialMatrixConstraint.h>
 
 #include <gtsam_unstable/geometry/Similarity3.h>
 
@@ -37,6 +39,7 @@ namespace SFO {
         std::cout << "Initial local coordinates: " << x0 << ", " << y0 << ", " << z0 << std::endl;
 
         mPoseId = 0;
+        mSwitchId = 0;
 
         gtsam::Rot3 enu_R_imu = gtsam::Rot3::RzRyRx(navdata0.roll, navdata0.pitch, navdata0.yaw);
         gtsam::Point3 enu_t_imu = gtsam::Point3(0, 0, 0);
@@ -91,18 +94,42 @@ namespace SFO {
         mNewValues.insert(gtsam::Symbol('x', mPoseId), lastPose * pose3T_delta);
 
         // If loop, add smart factors between matched frames
-        if(loopResult.detection()) {
+        if(false)//loopResult.detection()) {
             cv::Mat E = cv::findEssentialMat(loopResult.queryFeatures, loopResult.matchFeatures, mK1->fx(), cv::Point2d(mK1->px(), mK1->py()));
             cv::Mat Rtmp, ttmp;
             recoverPose(E, loopResult.queryFeatures, loopResult.matchFeatures, Rtmp, ttmp, mK1->fx(), cv::Point2d(mK1->px(), mK1->py()));
             gtsam::Rot3 R = cvtMatrix2Rot3(Rtmp);
             gtsam::Point3 t = cvtMatrix2Point3(ttmp);
+
+            //gtsam::EssentialMatrix trueE(trueRotation, trueDirection);
+            //mNewFactors.emplace_shared<gtsam::EssentialMatrixConstraint>()
+
             gtsam::Pose3 T = gtsam::Pose3(R, t);
             gtsam::noiseModel::Diagonal::shared_ptr loopNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << gtsam::Vector3::Constant(0.2), gtsam::Vector3(5, 1, 1)).finished());
-            mNewFactors.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3>>(gtsam::Symbol('x', loopResult.query), gtsam::Symbol('x', loopResult.match), T, loopNoise);
+
+            /*
+            Eigen::Matrix<double, 6, 6> information = Eigen::Matrix<double, 6, 6>::Identity();
+            Eigen::Matrix<double, 6, 6> mgtsam = Eigen::Matrix<double, 6, 6>::Identity();
+            mgtsam.block(0,0,3,3) = information.block(3,3,3,3); // cov rotation
+            mgtsam.block(3,3,3,3) = information.block(0,0,3,3); // cov translation
+            mgtsam.block(0,3,3,3) = information.block(0,3,3,3); // off diagonal
+            mgtsam.block(3,0,3,3) = information.block(3,0,3,3); // off diagonal
+            gtsam::SharedNoiseModel model = gtsam::noiseModel::Gaussian::Information(mgtsam);
+            */
+
+            //mNewFactors.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3>>(gtsam::Symbol('x', loopResult.query), gtsam::Symbol('x', loopResult.match), T, loopNoise);
+
+            double switchPrior = 1.0;
+            mNewValues.insert(gtsam::Symbol('s', mSwitchId), vertigo::SwitchVariableLinear(switchPrior));
+            gtsam::noiseModel::Diagonal::shared_ptr switchPriorModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector1(1.0));
+            mNewFactors.add(gtsam::PriorFactor<vertigo::SwitchVariableLinear>(gtsam::Symbol('s', mSwitchId), vertigo::SwitchVariableLinear(switchPrior), switchPriorModel));
+
+            mNewFactors.add(vertigo::BetweenFactorSwitchableLinear<gtsam::Pose3>(gtsam::Symbol('x', loopResult.query), gtsam::Symbol('x', loopResult.match), gtsam::Symbol('s', mSwitchId++), T, loopNoise));
+
             //gtsam::Similarity3 simT = gtsam::Similarity3(R, t, 1.0);
             //gtsam::noiseModel::Diagonal::shared_ptr simNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(7) << gtsam::Vector6::Constant(0.1), 10).finished()); // 10cm std on x,y,z 0.05 rad on roll,pitch,yaw
             //mNewFactors.emplace_shared<gtsam::BetweenFactor<gtsam::Similarity3> >(gtsam::Symbol('x', loopResult.query), gtsam::Symbol('x', loopResult.match), simT, simNoise);
+
             /*
             const gtsam::noiseModel::Isotropic::shared_ptr imageNoiseModel = gtsam::noiseModel::Isotropic::Sigma(2, 1.0);
             gtsam::Point2 pt1, pt2;
