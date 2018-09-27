@@ -72,9 +72,9 @@ LoopDetector::~LoopDetector(){
 // ---------------------------------------------------------------------------
 
 
-void LoopDetector::process(const cv::Mat &im, DLoopDetector::DetectionResult &result) {
+void LoopDetector::process(const cv::Mat &imgLeft, const cv::Mat &imgRight, DLoopDetector::DetectionResult &result) {
     // get features
-    mpExtractor->operator()(im, mvKeys, mvDescriptors);
+    mpExtractor->operator()(imgLeft, mvKeys, mvDescriptors);
 
     mpDetector->detectLoop(mvKeys, mvDescriptors, result);
     if(result.detection()) {

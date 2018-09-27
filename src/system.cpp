@@ -55,7 +55,7 @@ namespace SFO {
         }
 
         DLoopDetector::DetectionResult loopResult;
-        std::thread tLoopDetection(&LoopDetector::process, mpLoopDetector, imgLeft, std::ref(loopResult));
+        std::thread tLoopDetection(&LoopDetector::process, mpLoopDetector, imgLeft, imgRight, std::ref(loopResult));
         // process new images, push the images back to an internal ring buffer.
         // valid motion estimates are available after calling process for two times.
         // output: returns false if an error occurred.

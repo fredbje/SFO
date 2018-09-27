@@ -12,14 +12,29 @@
 //#include "tracking.h"
 
 int main(int argc, char **argv){
-    std::string strSequenceDir = "/home/fredbje/Datasets/kitti-gray/sequences/00";
-    std::string strSettingsFile = "/home/fredbje/git/SFO/examples/KITTI00-02.yaml";
-    std::string strTimestampsFile = "/home/fredbje/Datasets/kitti-gray/sequences/00/times.txt";
-    std::string strGtPosesFile = "/home/fredbje/Datasets/kitti-poses/dataset/poses/00.txt";
-    std::string strOxtsDir = "/home/fredbje/Datasets/2011_10_03/2011_10_03_drive_0027_sync/oxts/data";
-    std::string strImu2VeloCalibFile = "/home/fredbje/Datasets/2011_10_03/2011_10_03/calib_imu_to_velo.txt";
-    std::string strVelo2CamCalibFile = "/home/fredbje/Datasets/2011_10_03/2011_10_03/calib_velo_to_cam.txt";
-    std::string strVocabularyFile = "/home/fredbje/git/SFO/vocabulary/ORBvoc.txt";
+    if(argc != 2)
+    {
+        cerr << endl << "Usage: ./stereo_kitti path_to_settings" << endl;
+        return 1;
+    }
+
+    std::string strSettingsFile = argv[1];
+    cv::FileStorage fSettings(strSettingsFile, cv::FileStorage::READ);
+    if (!fSettings.isOpened()) {
+        std::cerr << "Failed to open settings file at: " << strSettingsFile
+                  << " in kitti-stereo.cpp" << std::endl;
+        return 1;
+    }
+
+    std::string strSequenceDir = fSettings["sequenceDir"];
+    std::string strTimestampsFile = fSettings["timestampsFile"];
+    std::string strGtPosesFile = fSettings["gtPosesFile"];
+    std::string strOxtsDir = fSettings["oxtsDir"];
+    std::string strImu2VeloCalibFile = fSettings["imu2VeloCalibFile"];
+    std::string strVelo2CamCalibFile = fSettings["velo2CamCalibFile"];
+    std::string strVocabularyFile = fSettings["vocabularyFile"];
+    
+    fSettings.release();
 
     std::vector<std::string> vstrLeftImages;
     std::vector<std::string> vstrRightImages;
@@ -27,20 +42,20 @@ int main(int argc, char **argv){
 
     std::vector<double> vTimestamps;
     loadTimeStamps(strTimestampsFile, vTimestamps);
-
     if(vTimestamps.size() != vstrLeftImages.size()) {
-        std::cerr << "Number of timestamps does not match number of images" << std::endl;
+        std::cerr << "Number of timestamps does not match number of images." << std::endl;
         return 1;
     }
 
     std::vector<oxts> vOxtsData;
     loadOxtsData(strOxtsDir, vOxtsData);
+    if(vOxtsData.size() < vstrLeftImages.size()) {
+        std::cerr << "Number of oxtsData does not match number of images." << std::endl;
+    }
 
     libviso2::Matrix imu_T_cam = loadCam2ImuTransform(strImu2VeloCalibFile, strVelo2CamCalibFile);
-
     std::vector<libviso2::Matrix> vGtPoses;
     loadGtPoses(strGtPosesFile, vGtPoses, imu_T_cam, vOxtsData[0]);
-
     if(vGtPoses.size() != vstrLeftImages.size()) {
         std::cerr << "Number of GT poses does not match number of images." << std::endl;
         return 1;
@@ -49,10 +64,8 @@ int main(int argc, char **argv){
     SFO::System SLAM(strSettingsFile, strVocabularyFile, vOxtsData[0], imu_T_cam, vGtPoses);
     cv::Mat imgLeft;
     cv::Mat imgRight;
-    //SFO::Tracking tracker(strSettingsFile);
     for (std::size_t i = 0; i < vstrLeftImages.size(); i++) { // 4541 images
         loadImages(imgLeft, imgRight, vstrLeftImages[i], vstrRightImages[i]);
-        //tracker.track(imgLeft, imgRight, 0);
         SLAM.trackStereo(imgLeft, imgRight, vTimestamps[i], vOxtsData[i]);
     }
 

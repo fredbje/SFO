@@ -3,6 +3,13 @@
 #--------------------------------------------------------------------------------------------
 # Camera Parameters. Adjust them!
 #--------------------------------------------------------------------------------------------
+sequenceDir: '/home/fredbje/Datasets/kitti-gray/sequences/00'
+timestampsFile: '/home/fredbje/Datasets/kitti-gray/sequences/00/times.txt'
+gtPosesFile: '/home/fredbje/Datasets/kitti-poses/dataset/poses/00.txt'
+oxtsDir: '/home/fredbje/Datasets/2011_10_03/2011_10_03_drive_0027_sync/oxts/data'
+imu2VeloCalibFile: '/home/fredbje/Datasets/2011_10_03/2011_10_03/calib_imu_to_velo.txt'
+velo2CamCalibFile: '/home/fredbje/Datasets/2011_10_03/2011_10_03/calib_velo_to_cam.txt'
+vocabularyFile: '/home/fredbje/git/SFO/vocabulary/ORBvoc.txt'
 
 # Camera calibration and distortion parameters (OpenCV) 
 Camera.fx: 718.856
