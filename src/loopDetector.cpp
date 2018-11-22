@@ -78,7 +78,7 @@ void LoopDetector::process(const cv::Mat &imgLeft, const cv::Mat &imgRight, DLoo
 
     mpDetector->detectLoop(mvKeys, mvDescriptors, result);
     if(result.detection()) {
-        std::cout << result.F << std::endl;
+        //std::cout << result.F << std::endl;
     }
 }
 

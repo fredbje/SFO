@@ -58,6 +58,7 @@ namespace SFO {
             std::unique_lock<std::mutex> lock(mMutex);
             drawFrame();
             lock.unlock();
+            std::cout << "mImgDisplay.size(): " << mImgDisplay.size << std::endl;
             cv::imshow("Stereo Gray Image", mImgDisplay);
             cv::waitKey(static_cast<int>(0.1*1e3)); //mT*1e3
             if(checkFinish()) {

@@ -16,11 +16,9 @@ namespace SFO {
     class System {
     public:
 
-        System(const std::string &strSettingsFile, const std::string &strVocabularyFile, const oxts &navdata0, const libviso2::Matrix &imu_T_cam);
-        System(const std::string &strSettingsFile, const std::string &strVocabularyFile, const oxts &navdata0, const libviso2::Matrix &imu_T_cam,
-               const std::vector<libviso2::Matrix> &vGtPoses);
+        System(const std::string &strSettingsFile, const std::string &strVocabularyFile);
         ~System();
-        void trackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const oxts &navdata);
+        void trackStereo(const cv::Mat &imLeft, const cv::Mat &imRight);
         void shutdown();
 
     private:

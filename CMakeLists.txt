@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.8)
 
 # Project name
-project(SFO)
+project(SFO_FFI)
 
 # Include our cmake files
 SET(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CMakeModules/)
@@ -81,13 +81,13 @@ set(sources_SFO
 
 
 # Create the main executable, and link libraries
-add_executable(kitti-stereo
-        examples/kitti-stereo.cpp
+add_executable(ffi-stereo
+        examples/ffi-stereo.cpp
         ${sources_SFO}
         ${sources_thirdparty}
 )
 
-target_link_libraries(kitti-stereo
+target_link_libraries(ffi-stereo
         ${Pangolin_LIBRARY}
         gtsam
         ${GTSAM_LIBS}

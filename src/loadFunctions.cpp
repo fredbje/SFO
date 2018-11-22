@@ -124,7 +124,7 @@ void loadGtPoses(const std::string &strGtPosesFile, std::vector<libviso2::Matrix
         tempPose.val[1][0] = r21; tempPose.val[1][1] = r22; tempPose.val[1][2] = r23; tempPose.val[1][3] = t2;
         tempPose.val[2][0] = r31; tempPose.val[2][1] = r32; tempPose.val[2][2] = r33; tempPose.val[2][3] = t3;
         tempPose.val[3][0] = 0.0; tempPose.val[3][1] = 0.0; tempPose.val[3][2] = 0.0; tempPose.val[3][3] = 1.0;
-        tempPose = enu_T_imu * imu_T_cam * tempPose ;
+        //tempPose = enu_T_imu * imu_T_cam * tempPose ;
         vGtPoses.push_back(tempPose);
     }
     std::cout << "Finished loading GT poses." << std::endl;

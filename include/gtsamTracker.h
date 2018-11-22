@@ -30,22 +30,21 @@ namespace SFO {
     class GtsamTracker {
     public:
 
-        GtsamTracker(const std::string &strSettingsFile, const oxts &navdata0, const libviso2::Matrix &imu_T_cam);
+        GtsamTracker(const std::string &strSettingsFile);
 
         ~GtsamTracker();
 
         gtsam::Pose3 cvtMatrix2Pose3(const libviso2::Matrix &Min);
         gtsam::Rot3 cvtMatrix2Rot3(const cv::Mat &Rin);
         gtsam::Point3 cvtMatrix2Point3(const cv::Mat &tin);
+        gtsam::Unit3 cvtMatrix2Unit3(const cv::Mat &tin);
         libviso2::Matrix cvtPose32Matrix(const gtsam::Pose3 &Min);
         void cvtMatrix2RT(const libviso2::Matrix &Min, gtsam::Rot3 &R, gtsam::Point3 &T);
         void cvtgtPose2RT(const gtsam::Pose3 &pose, libviso2::Matrix &ptrM);
 
         void update(const libviso2::Matrix &T_delta,
                     const std::vector<libviso2::Matcher::p_match> &vMatches,
-                    const std::vector<int32_t> &vInliers,
-                    const oxts &navdata,
-                    const DLoopDetector::DetectionResult &loopResult);
+                    const std::vector<int32_t> &vInliers);
 
         std::vector<libviso2::Matrix> optimize();
 
@@ -73,6 +72,7 @@ namespace SFO {
         gtsam::ISAM2 mIsam;
 
         DLoopDetector::DetectionResult mLoopResult;
+        int mnLoopsDetected;
 
         //GeographicLib::Geocentric earth(GeographicLib::Constants::WGS84_a(), GeographicLib::Constants::WGS84_f());
         GeographicLib::LocalCartesian mProj;

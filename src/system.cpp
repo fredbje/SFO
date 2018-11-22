@@ -8,33 +8,28 @@
 
 namespace SFO {
     System::System(const std::string &strSettingsFile,
-                   const std::string &strVocabularyFile,
-                   const oxts &navdata0,
-                   const libviso2::Matrix &imu_T_cam) {
+                   const std::string &strVocabularyFile) {
         mnFrame = 0;
         loadSettings(strSettingsFile);
+
         mpLoopDetector = new LoopDetector(strVocabularyFile, strSettingsFile);
         mpTracker = new libviso2::VisualOdometryStereo(mParam);
         mpFrameDrawer = new FrameDrawer(strSettingsFile);
         mtFrameDrawer = std::thread(&FrameDrawer::run, mpFrameDrawer);
-        mpGtsamTracker = new GtsamTracker(strSettingsFile, navdata0, imu_T_cam);
+
+
+        mpGtsamTracker = new GtsamTracker(strSettingsFile);
+        std::cout << "Got here!" << std::endl;
+
+
         mpMapDrawer = new MapDrawer(strSettingsFile);
         mtMapDrawer = std::thread(&MapDrawer::run, mpMapDrawer);
-
         // Initialize trajectory to the origin of the IMU.
-        mPose = imu_T_cam;
+        mPose = libviso2::Matrix::eye(4);
         mpvPoses = new std::vector<libviso2::Matrix>();
-        mpvPoses->push_back(imu_T_cam);
+        mpvPoses->push_back(mPose);
         mpMapDrawer->updatePoses(mpvPoses);
-    }
 
-    System::System(const std::string &strSettingsFile,
-                   const std::string &strVocabularyFile,
-                   const oxts &navdata0,
-                   const libviso2::Matrix &imu_T_cam,
-                   const std::vector<libviso2::Matrix> &vGtPoses)
-            : System(strSettingsFile, strVocabularyFile, navdata0, imu_T_cam) {
-        mpMapDrawer->setGtPoses(vGtPoses);
     }
 
     System::~System() {
@@ -47,9 +42,7 @@ namespace SFO {
     }
 
     void System::trackStereo(const cv::Mat &imgLeft,
-                             const cv::Mat &imgRight,
-                             const double &timestamp,
-                             const oxts &navdata) {
+                             const cv::Mat &imgRight) {
         if(imgLeft.size() != mImgSize || imgRight.size() != mImgSize) {
             std::cerr << "Error, images have different size than specified in settings file." << std::endl;
         }
@@ -72,7 +65,7 @@ namespace SFO {
 
             // inv(getMotion()) returns {t-1}^T_{t}. Right multiply with last pose to get {0}^T_{t}
             libviso2::Matrix T_delta = libviso2::Matrix::inv(mpTracker->getMotion());
-            mpGtsamTracker->update(T_delta, mvMatches, mvInliers, navdata, loopResult);
+            mpGtsamTracker->update(T_delta, mvMatches, mvInliers);
             *mpvPoses = mpGtsamTracker->optimize();
 
             //mPose = mPose * T_delta;
